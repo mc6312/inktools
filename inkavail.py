@@ -353,10 +353,9 @@ def print_tag_statistics(stats):
         print_stat_table(tagstat)
 
 
-def load_ink_stats():
-    #fname = os.path.expanduser('~/shareddocs/doc/upgrade/inks.org')
-    fname = 'inks.org'
+def load_ink_stats(fname):
     if not os.path.exists(fname):
+        print('Файл "%s" не найден' % fname)
         return 2
 
     #print(f'Загружаю {fname}')
@@ -366,7 +365,15 @@ def load_ink_stats():
 
 
 def main(args):
-    stats = load_ink_stats()
+    #TODO присобачить нормальную обработку командной строки
+    #TODO присобачить файл настроек с указанием файла БД
+
+    if len(args) < 2:
+        fname = 'inks.org'
+    else:
+        fname = os.path.expanduser(args[1])
+
+    stats = load_ink_stats(fname)
 
     print_total_statistics(stats)
     print_tag_statistics(stats)
