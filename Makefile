@@ -1,6 +1,7 @@
-packer = 7z
-pack = $(packer) a -mx=9
-arcx = .7z
+packer = tar
+pack = $(packer) caf
+unpack = $(packer) --keep-newer-files xaf
+arcx = .tar.xz
 todo = TODO
 docs = Changelog LICENSE README.md $(todo)
 basename = inktools
@@ -11,7 +12,7 @@ title_version = $(shell python3 -c 'from $(srcversion) import TITLE_VERSION; pri
 zipname = $(basename).zip
 arcname = $(basename)$(arcx)
 srcarcname = $(basename)-$(branch)-src$(arcx)
-srcs = orgmodeparser.py
+srcs = orgmodeparser.py inkavail.py inkrandom.py
 backupdir = ~/shareddocs/pgm/python/
 
 app:
@@ -22,6 +23,7 @@ app:
 	chmod 755 $(basename)
 
 archive:
+	make todo
 	$(pack) $(srcarcname) *.py *.org Makefile *.geany $(docs)
 distrib:
 	make app
@@ -32,7 +34,7 @@ backup:
 	make archive
 	mv $(srcarcname) $(backupdir)
 update:
-	$(packer) x -y $(backupdir)$(srcarcname)
+	$(unpack) $(backupdir)$(srcarcname)
 commit:
 	git commit -a -uno -m "$(version)"
 docview:
