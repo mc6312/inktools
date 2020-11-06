@@ -406,7 +406,7 @@
 [[http://getpen.ru/pilot-ink30-blue/i/966][флакон 30 мл в getpen]]
 **** в наличии
 флакон 30 мл
-** TODO Серия Iroshizuki [5/6]
+** TODO Серия Iroshizuki [4/5]
 *** DONE Pilot Iroshizuku Tsuki-yo                :green:blue:gray:wet:ink:
 Хорошие зеленовато-синевато-серые (teal?) чернила, слегка текучие. Пригодны для повседневного письма.
 **** где купить
@@ -438,7 +438,7 @@
 [[https://pilotrus.ru/chernila-dlya-perevykh-ruchek-pilot-iroshizuku-shin-kai-temno-sinie-15ml/][флакон 15 мл в pilotrus]]
 **** в наличии
 флакон 15 мл
-*** DONE Pilot Iroshizuku Fuyu-syogun                            :gray:ink:
+*** Pilot Iroshizuku Fuyu-syogun                            :gray:ink:
 Серые холодного оттенка чернила, текучесть и скользкость обычные для серии Iroshizuku.
 **** где купить
 [[http://getpen.ru/pilot-iroshizuku-fuyu-syogun/i/3528][флакон 50 мл в getpen]]
@@ -574,7 +574,7 @@
 [[https://www.citilink.ru/catalog/furniture/business_gifts/rashodnye_materialy_premium/815828/][флакон 50 мл в ситилинке]]
 *** наличие
 флакон 50 мл
-* deVENTE [2/2]
+* deVENTE [1/1]
 ** DONE deVENTE фиолетовые                             :violet:methylviolet:ink:
 [[http://devente.ru/chernila_dlya_perevyih_ruchek_deVENTE_5100705/][описание на сайте производителя]]
 Фиолетовые чернила, напоминают "Радугу-2", м.б. чуть менее насыщенные.
@@ -583,7 +583,7 @@
 сеть "Скрепка"
 *** в наличии
 флакон 70 мл
-** DONE deVENTE синие                                                 :blue:ink:
+** deVENTE синие                                                 :blue:ink:
 По цвету напоминают сильно разбавленные Royal Blue.
 Скорее, не чернила, а крашеная вода - использовать нельзя, сильно растекаются по бумаге.
 Выпаривание не помогает - растекаются в любом случае.

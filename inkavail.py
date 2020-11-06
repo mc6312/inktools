@@ -19,6 +19,17 @@ MILLILITERS = 1000.0
     не ломающие совместимость, т.к. для штатного парсера Emacs OrgMode
     являются простым текстом.
 
+    Ветви дерева, содержащие описания чернил, должны иметь метку "ink".
+
+    Статус ветвей:
+    - не указан: чернила НЕ планируются к покупке (т.к. забракованы
+      по какой-либо причине, в т.ч. по результатам испытаний)
+    - TODO: чернила планируются к покупке и/или испытанию
+    - DONE: чернила были куплены и испытаны
+
+    Наличие чернил в коллекции описано отдельно (см. ниже) и статусом
+    TODO/DONE/... не указывается.
+
     Данные, помещаемые в комментарии.
     После символа комментария обязателен пробел, чтобы стандартный парсер
     не спотыкался.
@@ -106,6 +117,10 @@ class InkNodeStatistics():
         # список экземпляров OrgHeadlineNode - отсутствующие чернила
         self.unavailInks = []
 
+        # список экземпляров OrgHeadlineNode - нафиг не нужные чернила
+        # (ветви, которые и не TODO, и не DONE)
+        self.unwantedInks = []
+
         # список экземпляров TagStatInfo - статистика по тэгам
         self.tagStats = []
 
@@ -116,11 +131,12 @@ class InkNodeStatistics():
         self.scan_node(rootnode, 0)
 
     def __repr__(self):
-        return '%s(availMl=%.2f, availInks=%s, unavailInks=%s, tagStats=%s)' % (
+        return '%s(availMl=%.2f, availInks=%s, unavailInks=%s, unwantedInks=%s, tagStats=%s)' % (
             self.__class__.__name__,
             self.availMl,
             self.availInks,
             self.unavailInks,
+            self.unwantedInks,
             self.tagStats)
 
     def get_ink_node_statistics(self, node):
@@ -138,53 +154,51 @@ class InkNodeStatistics():
 
         # это "чернильный" элемент дерева - его содержимым кормим статистику
 
-        if node.done is not None:
-            #TODO прикрутить какую-то статистику для ветвей, у которых done==None
+        # 1. скармливаем их статистике "по тэгам"
+        for tagstat in self.tagStats:
+            tagstat.gather_statistics(node)
 
-            # node.done == None
-            #   чернила НЕ планируются к покупке, в наличии могут или могли когда-то быть
-            # node.done == False
-            #   TODO: чернила планируются к покупке, в наличии нет
-            # node.done == True
-            #   DONE: чернила были куплены и испытаны, но не обязательно в наличии
+        # 2. собираем статистику по наличию чернил
 
-            # 1. скармливаем их статистике "по тэгам"
-            for tagstat in self.tagStats:
-                tagstat.gather_statistics(node)
+        # в документе не хранится - используется только статистикой
+        node.avail = False
+        node.availMl = 0.0
+        node.availCartridges = False
 
-            # 2. собираем статистику по наличию чернил
+        availnode = node.find_child_by_text('в наличии', OrgHeadlineNode)
+        if availnode is not None:
+            for child in availnode.children:
+                if type(child) is not OrgTextNode:
+                    continue
 
-            # в документе не хранится - используется только статистикой
-            node.avail = False
-            node.availMl = 0.0
-            node.availCartridges = False
+                rm = RX_AVAIL_ML.match(child.text)
+                if rm:
+                    try:
+                        avail = float(rm.group(1))
 
-            availnode = node.find_child_by_text('в наличии', OrgHeadlineNode)
-            if availnode is not None:
-                for child in availnode.children:
-                    if type(child) is not OrgTextNode:
-                        continue
-
-                    rm = RX_AVAIL_ML.match(child.text)
+                        node.avail = True
+                        node.availMl += avail
+                        self.availMl += avail
+                    except ValueError:
+                        pass
+                else:
+                    rm = RX_AVAIL_CR.match(child.text)
                     if rm:
-                        try:
-                            avail = float(rm.group(1))
+                        node.avail = True
+                        node.availCartridges = True
 
-                            node.avail = True
-                            node.availMl += avail
-                            self.availMl += avail
-                        except ValueError:
-                            pass
-                    else:
-                        rm = RX_AVAIL_CR.match(child.text)
-                        if rm:
-                            node.avail = True
-                            node.availCartridges = True
+        # Внимание:
+        # node.avail НЕ зависит от node.done
 
-            if node.avail:
-                self.availInks.append(node)
-            else:
-                self.unavailInks.append(node)
+        if node.avail:
+            self.availInks.append(node)
+        elif node.avail == False:
+            self.unavailInks.append(node)
+
+        # т.е. "нежелательные" могут одновременно быть в списках
+        # avail/unavail!
+        if node.done == None:
+            self.unwantedInks.append(node)
 
         return True
 
@@ -288,6 +302,7 @@ def print_total_statistics(stats):
 
     inksAvail = len(stats.availInks)
     inksUnavail = len(stats.unavailInks)
+    inksUnwanted = len(stats.unwantedInks)
     inksTotal = inksAvail + inksUnavail
 
     def __percent(n):
@@ -296,7 +311,8 @@ def print_total_statistics(stats):
 
     print(f'''Всего:       {inksTotal}
 В наличии:   {__percent(inksAvail)}, ≈{totalMl:.2f} {units}
-Отсутствуют: {__percent(inksUnavail)}''')
+Отсутствуют: {__percent(inksUnavail)}
+Не нужны:    {__percent(inksUnwanted)}''')
 
     #for node in stats.unavailInks:
     #    print(f'  {node.text}')
