@@ -259,7 +259,9 @@ def print_total_statistics(stats):
     inksUnavail = len(stats.unavailInks)
     inksTotal = inksAvail + inksUnavail
 
-    __percent = lambda n: '%d (%.1f%%)' % (n, 100.0 * n / inksTotal)
+    def __percent(n):
+        pc = 0 if inksTotal == 0 else 100.0 * n / inksTotal
+        return '%d (%.1f%%)' % (n, pc)
 
     print(f'''Всего:       {inksTotal}
 В наличии:   {__percent(inksAvail)}, ≈{totalMl:.2f} {units}
@@ -305,7 +307,8 @@ def print_tag_statistics(stats):
 
 
 def load_ink_stats():
-    fname = os.path.expanduser('~/shareddocs/doc/upgrade/inks.org')
+    #fname = os.path.expanduser('~/shareddocs/doc/upgrade/inks.org')
+    fname = 'inks.org'
     if not os.path.exists(fname):
         return 2
 
