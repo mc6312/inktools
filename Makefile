@@ -2,14 +2,12 @@ packer = 7z
 pack = $(packer) a -mx=9
 arcx = .7z
 todo = TODO
-docs = Changelog
-#docs = COPYING README.md $(todo)
-basename = orgmode
-srcversion = orgmodeparser
+docs = Changelog LICENSE README.md $(todo)
+basename = inktools
+srcversion = inkavail
 version = $(shell python3 -c 'from $(srcversion) import VERSION; print(VERSION)')
-#branch = $(shell git symbolic-ref --short HEAD)
-branch =
-#title_version = $(shell python3 -c 'from $(srcversion) import TITLE_VERSION; print(TITLE_VERSION)')
+branch = $(shell git symbolic-ref --short HEAD)
+title_version = $(shell python3 -c 'from $(srcversion) import TITLE_VERSION; print(TITLE_VERSION)')
 zipname = $(basename).zip
 arcname = $(basename)$(arcx)
 srcarcname = $(basename)-$(branch)-src$(arcx)
@@ -48,5 +46,5 @@ show-branch:
 	@echo "$(branch)"
 todo:
 	pytodo.py $(srcs) >$(todo)
-edit-sample:
-	emacs --no-desktop -nw sample.org bigsample.org
+edit-db:
+	emacs --no-desktop -nw inks.org

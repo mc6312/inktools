@@ -8,6 +8,11 @@ from orgmodeparser import *
 import re
 
 
+VERSION = '1.0'
+TITLE = 'InkAvail'
+TITLE_VERSION = '%s v%s' % (TITLE, VERSION)
+
+
 MILLILITERS = 1000.0
 
 
