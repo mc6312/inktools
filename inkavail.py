@@ -314,6 +314,7 @@ class InkNodeStatistics():
 
 
 def print_total_statistics(stats):
+    #TODO переделать под генерацию списка строк для отображения в консоли и GTK UI
     totalMl = stats.availMl
 
     if totalMl < MILLILITERS:
@@ -342,6 +343,7 @@ def print_total_statistics(stats):
 
 
 def print_tag_statistics(stats):
+    #TODO переделать под генерацию списка строк для отображения в консоли и GTK UI
     def print_stat_table(tagstat):
         print(f'\n{tagstat.title}:')
 
@@ -378,9 +380,13 @@ def print_tag_statistics(stats):
 
 
 def load_ink_stats(fname):
+    if not fname:
+        print('Файл не указан')
+        return None
+
     if not os.path.exists(fname):
         print('Файл "%s" не найден' % fname)
-        return 2
+        return None
 
     #print(f'Загружаю {fname}')
     rootnode = MinimalOrgParser(fname)
@@ -388,23 +394,29 @@ def load_ink_stats(fname):
     return InkNodeStatistics(rootnode)
 
 
-def main(args):
-    #TODO присобачить нормальную обработку командной строки
-    #TODO присобачить файл настроек с указанием файла БД
+def process_cmdline():
+    #TODO м.б. присобачить нормальную обработку командной строки
 
-    if len(args) < 2:
+    if len(sys.argv) < 2:
         fname = 'inks.org'
     else:
-        fname = os.path.expanduser(args[1])
+        fname = os.path.expanduser(sys.argv[1])
 
-    stats = load_ink_stats(fname)
+    return fname
+
+
+def __term_main():
+    #TODO присобачить файл настроек с указанием файла БД
 
     print('%s\n' % TITLE_VERSION)
-    print_total_statistics(stats)
-    print_tag_statistics(stats)
+
+    stats = load_ink_stats(process_cmdline())
+    if stats:
+        print_total_statistics(stats)
+        print_tag_statistics(stats)
 
     return 0
 
 
 if __name__ == '__main__':
-    sys.exit(main(sys.argv))
+    sys.exit(__term_main())

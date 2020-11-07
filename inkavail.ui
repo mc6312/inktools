@@ -31,9 +31,7 @@
       <column type="gchararray"/>
     </columns>
   </object>
-  <object class="GtkWindow">
-    <property name="name">inkavailwnd</property>
-    <property name="visible">True</property>
+  <object class="GtkWindow" id="inkavailwnd">
     <property name="can_focus">False</property>
     <property name="border_width">4</property>
     <signal name="destroy" handler="wnd_destroy" swapped="no"/>
