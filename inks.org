@@ -4,7 +4,7 @@
 # @TAGSTAT Специальные:Признак:ferro methylviolet shimmer sheen
 # @TAGNAMES dark=тёмные:black=чёрные:blue=синие:blue_black=сине-чёрные:gray=серые:green=зелёные:red=красные:brown=коричневые:violet=фиолетовые:fuchsia=фуксия:dry=сухие:wet=текучие:orange=оранжевые:yellow=жёлтые:light=светлые:ferro=железо-галловые:methylviolet=метилвиолет:turquoise=бирюзовые:royal_blue=фиолетово-синие:shimmer=блеск:sheen=отлив:
 
-* De Profundis [3/4]
+* De Profundis [2/2]
 [[https://www.de-profundis-ink.com/][сайт производителя]]
 ** DONE De Profundis Underwater Madness BlackBlue      :blue_black:dark:ink:
 Зеленовато-синевато-чёрные чернила, с хорошо различимым оттенком, по разному выглядящим при разном освещении. Умеренно текучи. Пригодны для повседневного письма.
@@ -42,10 +42,10 @@
 *** TODO Hydrazine 200th Mourning Black Lodge                    :black:ink:
 Нету, но очень надо.
 * Kahlerberg [0/1]
-** TODO Kahlerberg Sinister Blue                                  :blue:ink:
-* Albatross [1/2]
+** TODO Montchavue Sinister Blue                                  :blue:ink:
+* Albatros [1/2]
 [[https://www.albatrossss.com/][сайт производителя]]
-** DONE Серия Albatross 3999 [2/2]
+** DONE Серия Albatros 3999 [2/2]
 *** DONE Albatros 3999 Blue-Black               :blue_black:blue:gray:ferro:ink:
 Сине-чёрные ферро-галловые чернила.
 Цвет, в зависимости от подачи ручки и толщины пера - от серо-голубого до сине-чёрного,
@@ -70,22 +70,22 @@
 **** в наличии
 флакон 50 мл
 *** TODO Albatros Blutigerstein Jasper                           :red:brown:ink:
-* Astronaut [1/2]
+* Diver [1/2]
 ** DONE Обычные [2/2]
-*** DONE Astronaut Black                                            :black:ink:
+*** DONE Diver Black                                            :black:ink:
 Обычные чёрные не очень насыщенного оттенка чернила (но не серые), средней текучести, пригодны для повседневного использования.
 **** в наличии
 флакон 30 мл
-*** DONE Astronaut Blue                                        :blue:light:ink:
+*** DONE Diver Blue                                        :blue:light:ink:
 Средней насыщенности хорошие синие чернила, пригодны для повседневного использования.
 **** в наличии
 флакон 30 мл
 ** TODO Серия Karāburotto [1/1]
-*** DONE Astronaut Karāburotto Haimidoriiro                :green:blue:gray:wet:ink:
+*** DONE Diver Karāburotto Haimidoriiro                :green:blue:gray:wet:ink:
 Хорошие зеленовато-синевато-серые (teal?) чернила, слегка текучие. Пригодны для повседневного письма.
 **** в наличии
 флакон 15 мл
-*** Astronaut Karāburotto Jamu no mizutamari                    :fuchsia:violet:dark:wet:ink:
+*** Diver Karāburotto Jamu no mizutamari                    :fuchsia:violet:dark:wet:ink:
 Качественные, но несколько текучие чернила красно-фиолетового цвета.
 Напоминают при разном освещении винище или смородиновое варенье, а иногда очень тёмный вариант девАчковой фуксии. С таким цветом подходят скорее для баловства, чем для повседневного письма.
 **** в наличии
@@ -97,7 +97,7 @@
 Выпаривание не помогает - растекаются в любом случае.
 *** в наличии
 флакон 70 мл
-* Альфа Мгла-3 [1/1]
+* Альфа [1/1]
 ** DONE Мгла-3 фиолетовые                          :violet:methylviolet:ink:
 Ядрёные чернила на основе метилвиолета, для них нужна отдельная ручка (он от пластика не отмывается).
 *** в наличии

@@ -8,7 +8,7 @@ from orgmodeparser import *
 import re
 
 
-VERSION = '1.0.1'
+VERSION = '1.0.2'
 TITLE = 'InkAvail'
 TITLE_VERSION = '%s v%s' % (TITLE, VERSION)
 
@@ -63,15 +63,16 @@ RX_AVAIL_CR = re.compile('.*картридж.*', re.UNICODE|re.IGNORECASE)
 
 class TagStatInfo():
     class TagStatValue():
-        __slots__ = 'available', 'unavailable'
+        __slots__ = 'available', 'unavailable', 'unwanted'
 
         def __init__(self):
             self.available = 0
             self.unavailable = 0
+            self.unwanted = 0
 
         def __repr__(self):
-            return '%s(available=%d, unavailable=%d)' % (self.__class__.__name__,
-                self.available, self.unavailable)
+            return '%s(available=%d, unavailable=%d, unwanted=%d)' % (self.__class__.__name__,
+                self.available, self.unavailable, self.unwanted)
 
     def __init__(self, title, col1title, tags):
         """Параметры:
@@ -100,11 +101,14 @@ class TagStatInfo():
                 nfo = self.TagStatValue()
                 self.stats[tag] = nfo
 
-            if inknode.done == True:
+            if inknode.avail:
                 nfo.available += 1
-            elif inknode.done == False:
+            else:
+                # inknode.avail == False:
                 nfo.unavailable += 1
-            # inknode.done == None игнорируем
+
+            if inknode.done is None:
+                nfo.unwanted += 1
 
 
 class InkNodeStatistics():
@@ -154,11 +158,7 @@ class InkNodeStatistics():
 
         # это "чернильный" элемент дерева - его содержимым кормим статистику
 
-        # 1. скармливаем их статистике "по тэгам"
-        for tagstat in self.tagStats:
-            tagstat.gather_statistics(node)
-
-        # 2. собираем статистику по наличию чернил
+        # 1. собираем статистику по наличию чернил
 
         # в документе не хранится - используется только статистикой
         node.avail = False
@@ -199,6 +199,10 @@ class InkNodeStatistics():
         # avail/unavail!
         if node.done == None:
             self.unwantedInks.append(node)
+
+        # 2. скармливаем их статистике "по тэгам"
+        for tagstat in self.tagStats:
+            tagstat.gather_statistics(node)
 
         return True
 
@@ -306,23 +310,24 @@ def print_total_statistics(stats):
     inksTotal = inksAvail + inksUnavail
 
     def __percent(n):
-        pc = 0 if inksTotal == 0 else 100.0 * n / inksTotal
-        return '%d (%.1f%%)' % (n, pc)
+        pc = '%.1f%%' % (0 if inksTotal == 0 else 100.0 * n / inksTotal)
 
-    print(f'''Всего:       {inksTotal}
-В наличии:   {__percent(inksAvail)}, ≈{totalMl:.2f} {units}
-Отсутствуют: {__percent(inksUnavail)}
-Не нужны:    {__percent(inksUnwanted)}''')
+        return '{:>5d} {:>7s}'.format(n, pc)
 
-    #for node in stats.unavailInks:
-    #    print(f'  {node.text}')
+    print('''Всего:       {:>5d}
+В наличии:   {:s}, ≈{:.2f} {:s}
+Отсутствуют: {:s}
+Не нужны:    {:s}'''.format(inksTotal,
+        __percent(inksAvail), totalMl, units,
+        __percent(inksUnavail),
+        __percent(inksUnwanted)))
 
 
 def print_tag_statistics(stats):
     def print_stat_table(tagstat):
         print(f'\n{tagstat.title}:')
 
-        widths = [0, 0, 0]
+        widths = [0, 0, 0, 0]
 
         def update_widths(r):
             for col, s in enumerate(r):
@@ -330,7 +335,7 @@ def print_tag_statistics(stats):
                 if sl > widths[col]:
                     widths[col] = sl
 
-        table = [(tagstat.col1title, 'Есть', 'Нет')]
+        table = [(tagstat.col1title, 'Есть', 'Нет', 'Н/н')]
         update_widths(table[0])
 
         def __to_str(i):
@@ -339,12 +344,13 @@ def print_tag_statistics(stats):
         for tag, nfo in sorted(tagstat.stats.items(), key=lambda r: r[1].available, reverse=True):
             rec = (stats.tagNames[tag] if tag in stats.tagNames else tag,
                 __to_str(nfo.available),
-                __to_str(nfo.unavailable))
+                __to_str(nfo.unavailable),
+                __to_str(nfo.unwanted))
 
             update_widths(rec)
             table.append(rec)
 
-        tformat = '  {:<%ds}  {:>%ds}  {:>%ds}' % (*widths,)
+        tformat = '  {:<%ds}  {:>%ds}  {:>%ds}  {:>%ds}' % (*widths,)
 
         for rec in table:
             print(tformat.format(*rec))
@@ -375,6 +381,7 @@ def main(args):
 
     stats = load_ink_stats(fname)
 
+    print('%s\n' % TITLE_VERSION)
     print_total_statistics(stats)
     print_tag_statistics(stats)
 
