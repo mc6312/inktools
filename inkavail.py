@@ -26,7 +26,7 @@ from orgmodeparser import *
 import re
 
 
-VERSION = '1.0.2'
+VERSION = '1.0.3'
 TITLE = 'InkAvail'
 TITLE_VERSION = '%s v%s' % (TITLE, VERSION)
 
@@ -92,12 +92,15 @@ class TagStatInfo():
             return '%s(available=%d, unavailable=%d, unwanted=%d)' % (self.__class__.__name__,
                 self.available, self.unavailable, self.unwanted)
 
-    def __init__(self, title, col1title, tags):
+    def __init__(self, totals, title, col1title, tags):
         """Параметры:
-        title       - название статистической таблицы,
-        col1title   - название первого столбца,
+        totals      - экземпляр класса InkNodeStatistics,
+                      которому принадлежит текущий экземпляр TagStatInfo;
+        title       - название статистической таблицы;
+        col1title   - название первого столбца;
         tags        - список меток, которые учитывать."""
 
+        self.totalstats = totals
         self.title = title
         self.col1title = col1title
         self.tags = set(tags) # все метки, которые учитываем
@@ -128,6 +131,31 @@ class TagStatInfo():
             if inknode.done is None:
                 nfo.unwanted += 1
 
+    def get_stat_table(self):
+        """Возвращает список списков, содержащих строки со
+        значениями статистических данных.
+
+        Столбцы:
+        1. в первой строке таблицы - название таблицы,
+           в следующих - человекочитаемое название метки;
+        2, 3, 4: в первой строке таблицы - заголовки столбцов;
+           в следующих - значения счётчиков."""
+
+        table = []
+
+        def __to_str(i):
+            return '-' if i == 0 else str(i)
+
+        for tag, nfo in sorted(self.stats.items(), key=lambda r: r[1].available, reverse=True):
+            row = [self.totalstats.tagNames[tag] if tag in self.totalstats.tagNames else tag,
+                   __to_str(nfo.available),
+                   __to_str(nfo.unavailable),
+                   __to_str(nfo.unwanted)]
+
+            table.append(row)
+
+        return table
+
 
 class InkNodeStatistics():
     def __init__(self, rootnode):
@@ -151,6 +179,38 @@ class InkNodeStatistics():
         self.tagNames = {}
 
         self.scan_node(rootnode, 0)
+
+    def get_total_result_table(self):
+        """Возвращает список списков, содержащих строки
+        со значениями общей статистики."""
+
+        totalMl = self.availMl
+
+        if totalMl < MILLILITERS:
+            units = 'мл'
+        else:
+            totalMl /= MILLILITERS
+            units = 'л'
+
+        inksAvail = len(self.availInks)
+        inksUnavail = len(self.unavailInks)
+        inksUnwanted = len(self.unwantedInks)
+        inksTotal = inksAvail + inksUnavail
+
+        def __percent(n):
+            pc = '%.1f%%' % (0 if inksTotal == 0 else 100.0 * n / inksTotal)
+
+            return (str(n), pc)
+
+        # 4 столбца: название поля, абсолютное значение, процент от общего числа, объем в л/мл
+        # объем указывается только для чернил в наличии, для прочих - пустые строки
+
+        return [
+                ['Всего:', str(inksTotal), '', ''],
+                ['В наличии:', *__percent(inksAvail), '≈{:.2f} {:s}'.format(totalMl, units)],
+                ['Отсутствуют:', *__percent(inksUnavail), ''],
+                ['Не нужны:', *__percent(inksUnwanted), ''],
+               ]
 
     def __repr__(self):
         return '%s(availMl=%.2f, availInks=%s, unavailInks=%s, unwantedInks=%s, tagStats=%s)' % (
@@ -282,7 +342,7 @@ class InkNodeStatistics():
         if not tstags:
             return
 
-        self.tagStats.append(TagStatInfo(tstitle, tsc1title, tstags))
+        self.tagStats.append(TagStatInfo(self, tstitle, tsc1title, tstags))
 
     def __process_tagnames_directive(self, dvalue):
         # переводы названий тэгов в формате
@@ -313,73 +373,59 @@ class InkNodeStatistics():
             self.__process_tagnames_directive(dvalue)
 
 
+def print_table(headers, printheader, table):
+    """Вывод в stdout отформатированной таблицы.
+
+    headers     - список кортежей, содержащих по две строки:
+                  1. текст заголовка;
+                  2. символ выравнивания для форматирования;
+    printheader - булевское значение, False - не печатать заголовок;
+    table       - список списков, содержащих строки."""
+
+    #TODO м.б. стоит присобачить проверку правильности параметров
+
+    widths = [0] * len(headers)
+
+    def update_widths(row):
+        for col, s in enumerate(row):
+            sl = len(s)
+            if sl > widths[col]:
+                widths[col] = sl
+
+    header = []
+
+    header = list(map(lambda v: v[0], headers))
+    update_widths(header)
+
+    for r in table:
+        update_widths(r)
+
+    tabfmt = '  '.join(list(map(lambda h: '{:%s%ds}' % (h[1][1], widths[h[0]]), enumerate(headers))))
+
+    if printheader:
+        print(tabfmt.format(*header))
+
+    for r in table:
+        print(tabfmt.format(*r))
+
+
 def print_total_statistics(stats):
-    #TODO переделать под генерацию списка строк для отображения в консоли и GTK UI
-    totalMl = stats.availMl
+    totals = stats.get_total_result_table()
 
-    if totalMl < MILLILITERS:
-        units = 'мл'
-    else:
-        totalMl /= MILLILITERS
-        units = 'л'
-
-    inksAvail = len(stats.availInks)
-    inksUnavail = len(stats.unavailInks)
-    inksUnwanted = len(stats.unwantedInks)
-    inksTotal = inksAvail + inksUnavail
-
-    def __percent(n):
-        pc = '%.1f%%' % (0 if inksTotal == 0 else 100.0 * n / inksTotal)
-
-        return '{:>5d} {:>7s}'.format(n, pc)
-
-    print('''Всего:       {:>5d}
-В наличии:   {:s}, ≈{:.2f} {:s}
-Отсутствуют: {:s}
-Не нужны:    {:s}'''.format(inksTotal,
-        __percent(inksAvail), totalMl, units,
-        __percent(inksUnavail),
-        __percent(inksUnwanted)))
+    print_table((('', '<'), ('', '>'), ('', '>'), ('', '>')),
+        False,
+        totals)
 
 
 def print_tag_statistics(stats):
-    #TODO переделать под генерацию списка строк для отображения в консоли и GTK UI
-    def print_stat_table(tagstat):
-        print(f'\n{tagstat.title}:')
-
-        widths = [0, 0, 0, 0]
-
-        def update_widths(r):
-            for col, s in enumerate(r):
-                sl = len(s)
-                if sl > widths[col]:
-                    widths[col] = sl
-
-        table = [(tagstat.col1title, 'Есть', 'Нет', 'Н/н')]
-        update_widths(table[0])
-
-        def __to_str(i):
-            return '-' if i == 0 else str(i)
-
-        for tag, nfo in sorted(tagstat.stats.items(), key=lambda r: r[1].available, reverse=True):
-            rec = (stats.tagNames[tag] if tag in stats.tagNames else tag,
-                __to_str(nfo.available),
-                __to_str(nfo.unavailable),
-                __to_str(nfo.unwanted))
-
-            update_widths(rec)
-            table.append(rec)
-
-        tformat = '  {:<%ds}  {:>%ds}  {:>%ds}  {:>%ds}' % (*widths,)
-
-        for rec in table:
-            print(tformat.format(*rec))
-
     for tagstat in stats.tagStats:
-        print_stat_table(tagstat)
+        print('\n%s' % tagstat.title)
+        print_table(((tagstat.col1title, '<'), ('Есть', '>'), ('Нет', '>'), ('Н/н', '>')),
+                    True,
+                    tagstat.get_stat_table())
 
 
-def load_ink_stats(fname):
+def load_ink_db(fname):
     if not fname:
         print('Файл не указан')
         return None
@@ -389,9 +435,10 @@ def load_ink_stats(fname):
         return None
 
     #print(f'Загружаю {fname}')
-    rootnode = MinimalOrgParser(fname)
+    return MinimalOrgParser(fname)
 
-    return InkNodeStatistics(rootnode)
+def get_ink_stats(db):
+    return InkNodeStatistics(db) if db is not None else None
 
 
 def process_cmdline():
@@ -410,7 +457,7 @@ def __term_main():
 
     print('%s\n' % TITLE_VERSION)
 
-    stats = load_ink_stats(process_cmdline())
+    stats = get_ink_stats(load_ink_db(process_cmdline()))
     if stats:
         print_total_statistics(stats)
         print_tag_statistics(stats)

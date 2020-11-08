@@ -12,11 +12,12 @@ title_version = $(shell python3 -c 'from $(srcversion) import TITLE_VERSION; pri
 zipname = $(basename).zip
 arcname = $(basename)$(arcx)
 srcarcname = $(basename)-$(branch)-src$(arcx)
-srcs = orgmodeparser.py inkavail.py inkrandom.py
+srcs = *.py *.ui
+resources = *.svg
 backupdir = ~/shareddocs/pgm/python/
 
 app:
-	$(pack) -tzip $(zipname) $(srcs)
+	zip -9 $(zipname) $(srcs) $(resources)
 	@echo '#!/usr/bin/env python3' >$(basename)
 	@cat $(zipname) >>$(basename)
 	rm $(zipname)
@@ -24,7 +25,7 @@ app:
 
 archive:
 	make todo
-	$(pack) $(srcarcname) *.py *.org Makefile *.geany $(docs)
+	$(pack) $(srcarcname) *.py *.ui *.svg *.org Makefile *.geany $(docs)
 distrib:
 	make app
 	$(eval distname = $(basename)-$(version)$(arcx))
