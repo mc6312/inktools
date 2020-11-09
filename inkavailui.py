@@ -32,6 +32,8 @@ from inkrandom import RandomInkChooser
 
 
 class MainWnd():
+    PAGE_STAT, PAGE_CHOICE = range(2)
+
     def wnd_destroy(self, widget):
         Gtk.main_quit()
 
@@ -42,6 +44,7 @@ class MainWnd():
 
         self.dbfname = fname
         self.db = None
+        self.rndchooser = None
         self.stats = None
 
         #
@@ -56,19 +59,26 @@ class MainWnd():
         self.headerbar.set_title(TITLE_VERSION)
 
         #
+        self.pages = uibldr.get_object('pages')
+
         self.totalstatlstore, self.totalstatview = get_ui_widgets(uibldr,
             ('totalstatlstore', 'totalstatview'))
 
         self.detailstatststore, self.detailstatsview = get_ui_widgets(uibldr,
             ('detailstatststore', 'detailstatsview'))
 
-        self.srcfilebtn = uibldr.get_object('srcfilebtn')
+        self.openorgfiledlg = uibldr.get_object('openorgfiledlg')
 
-        self.randominkname, self.randominkdesc, self.randominkavail = get_ui_widgets(uibldr,
-            ('randominkname', 'randominkdesc', 'randominkavail'))
+        self.randominkname, self.randominktags, self.randominkdesc, self.randominkavail = get_ui_widgets(uibldr,
+            ('randominkname', 'randominktags', 'randominkdesc', 'randominkavail'))
+        self.randominkdescbuf = self.randominkdesc.get_buffer()
+
+        # грязный хакЪ из-за ошибки в Glade 3.22.2, криво генерирующей элементы меню со значками
+        mnuFile = uibldr.get_object('mnuFile')
+        img = Gtk.Image.new_from_icon_name('open-menu-symbolic', Gtk.IconSize.MENU)
+        mnuFile.add(img)
 
         #
-
         uibldr.connect_signals(self)
 
         self.load_db()
@@ -85,6 +95,7 @@ class MainWnd():
         try:
             self.db = load_ink_db(self.dbfname)
             self.stats = get_ink_stats(self.db)
+            self.rndchooser = None
 
             if self.stats:
                 dfname = os.path.split(self.dbfname)[-1]
@@ -102,12 +113,14 @@ class MainWnd():
                     for row in tagstat.get_stat_table():
                         self.detailstatststore.append(itr, row)
 
+                #TODO когда-нибудь потом прикрутить тэги для выбора
+                self.rndchooser = RandomInkChooser(self.stats, None, None)
+
             else:
                 dfname = ''
 
-            self.srcfilebtn.select_filename(self.dbfname)
+            self.openorgfiledlg.select_filename(self.dbfname)
             self.headerbar.set_subtitle(dfname)
-
 
         finally:
             self.detailstatsview.set_model(self.detailstatststore)
@@ -116,41 +129,53 @@ class MainWnd():
 
         self.choose_random_ink()
 
-    def srcfilebtn_file_set(self, fcbtn):
-        fname = fcbtn.get_filename()
-
-        if fname != self.dbfname:
-            self.dbfname = fname
-            self.load_db()
-
     def choose_random_ink(self):
-        if self.stats is None:
+        if self.rndchooser is None:
             inknamet = '...'
             inkdesct = ''
             inkavailt = ''
         else:
-            chooser = RandomInkChooser(self.stats)
-
             #TODO присобачить выбор меток
-            ink = chooser.choice(set(), set()) #excludeTags, includeTags)
+            ink = self.rndchooser.choice()
+
             if not ink:
-                inkt = 'ничего подходящего не нашлось'
+                inknamet = 'ничего подходящего не нашлось'
+                inktagst = '-'
+                inkdesct = ''
+                inkavailt = '-'
             else:
-                inkName, inkTags, inkDescription, inkAvailability = chooser.get_ink_description(ink)
+                inkName, inkTags, inkDescription, inkAvailability = self.stats.get_ink_description(ink)
 
-                inknamet = '<b>%s</b> (%s)' % (markup_escape_text(inkName),
-                    markup_escape_text(inkTags))
-
-                inkdesct = markup_escape_text(inkDescription)
-
+                inknamet = '<b>%s</b>' % markup_escape_text(inkName)
+                inktagst = markup_escape_text(inkTags) if inkTags else '-'
+                inkdesct = inkDescription
                 inkavailt = 'В наличии: %s' % markup_escape_text(inkAvailability)
 
         self.randominkname.set_markup(inknamet)
-        self.randominkdesc.set_markup(inkdesct)
+        self.randominktags.set_markup(inktagst)
+        self.randominkdescbuf.set_text(inkdesct)
         self.randominkavail.set_markup(inkavailt)
 
     def randomchbtn_clicked(self, btn):
         self.choose_random_ink()
+
+    def mnuRandomChoice_activate(self, wgt):
+        self.choose_random_ink()
+        self.pages.set_current_page(self.PAGE_CHOICE)
+
+    def mnuFileOpen_activate(self, mi):
+        self.openorgfiledlg.show_all()
+        r = self.openorgfiledlg.run()
+        self.openorgfiledlg.hide()
+
+        if r == Gtk.ResponseType.OK:
+            fname = self.openorgfiledlg.get_filename()
+
+            if fname != self.dbfname:
+                self.dbfname = fname
+                self.load_db()
+
+            self.pages.set_current_page(self.PAGE_STAT)
 
     def main(self):
         Gtk.main()

@@ -28,19 +28,37 @@ from inkavail import *
 
 
 class RandomInkChooser():
-    def __init__(self, stats):
+    def __init__(self, stats, excludetags, includetags):
         """Параметры:
-        stats       - экземпляр inkavail.InkNodeStatistics"""
+        excludetags     - None или множество строк с тэгами,
+                          которые НЕ ДОЛЖНЫ попадать в выбор;
+        includetags     - None или множество строк с тэгами,
+                          которые ДОЛЖНЫ попадать в выбор.
+        stats           - экземпляр inkavail.InkNodeStatistics.
+
+        Поля:
+        stats           - экземпляр inkavail.InkNodeStatistics;
+        inks            - отфильтрованный (по меткам) список экземпляров)
+                          OrgHeadlineNode с данными о чернилах, которые
+                          есть в наличии."""
 
         self.stats = stats
+        self.inks = []
 
-    def choice(self, excludetags, includetags):
-        """Параметры:
-        excludetags - множество строк с тэгами, которые НЕ должны попадать в выбор;
-        includetags - множество строк с тэгами, которые должны попадать в выбор.
+        self.nInks = 0
+        self.lastChoice = None
 
-        Возвращает экземпляр OrgHeadlineNode (если было из чего выбират)
-        или None."""
+        self.filter_inks(excludetags, includetags)
+
+    def filter_inks(self, excludetags, includetags):
+        """Заполнение списка inks экземплярами OrgHeadlineNode
+        с данными чернил, соответствующих меткам.
+
+        Параметры:
+        excludetags - None или множество строк с тэгами,
+                      которые НЕ ДОЛЖНЫ попадать в выбор;
+        includetags - None или множество строк с тэгами,
+                      которые ДОЛЖНЫ попадать в выбор."""
 
         def __filter_ink(ink):
             """Параметры:
@@ -63,50 +81,30 @@ class RandomInkChooser():
             return True
 
         if self.stats:
-            inks = list(filter(__filter_ink, self.stats.availInks))
+            self.inks = list(filter(__filter_ink, self.stats.availInks))
+        else:
+            self.inks.clear()
 
-            if inks:
-                return random_choice(inks)
+        self.nInks = len(self.inks)
 
-        return None
+    def choice(self):
+        """Возвращает случайный экземпляр OrgHeadlineNode
+        (если было из чего выбирать) или None."""
 
-    def get_ink_description(self, ink):
-        """Получение описания чернил.
+        if self.nInks >= 2:
+            # не присобачить ли счетчик на случай зацикливания ГПСЧ на одинаковом значении?
+            while True:
+                ink = random_choice(self.inks)
+                if ink != self.lastChoice:
+                    break
+        elif self.nInks == 1:
+            ink = self.nInks[0]
+        else:
+            ink = None
 
-        Параметры:
-            ink         - экземпляр OrgHeadlineNode.
+        self.lastChoice = ink
 
-        Возвращает кортеж из четырёх строк:
-        'название', 'отсортированный список человекочитаемых меток',
-        'описание', 'наличие'."""
-
-        desc = []
-
-        for chld in ink.children:
-            if isinstance(chld, OrgTextNode):
-                desc.append(chld.text)
-
-        avails = []
-
-        if ink.availMl > 0.0:
-            if ink.availMl < 500.0:
-                avs = '%.f мл' % ink.availMl
-            else:
-                avs = '%.2f л' % (ink.availMl / 1000.0)
-            avails.append(avs)
-
-        if ink.availCartridges:
-            avails.append('картриджи')
-
-        # некоторый костылинг
-        disptags = ink.tags.copy()
-        # удаляем служебную метку - она нужна при загрузке БД, не для отображения
-        disptags.remove('ink')
-
-        return (ink.text,
-                ', '.join(sorted(map(lambda tag: self.stats.tagNames[tag] if tag in self.stats.tagNames else tag, disptags))),
-                '\n'.join(desc),
-                ' и '.join(avails))
+        return ink
 
 
 def __rc_main():
@@ -131,13 +129,13 @@ def __rc_main():
         else:
             includeTags.add(arg)
 
-    chooser = RandomInkChooser(stats)
+    chooser = RandomInkChooser(stats, excludeTags, includeTags)
 
-    ink = chooser.choice(excludeTags, includeTags)
+    ink = chooser.choice()
     if not ink:
         print('ничего подходящего не нашлось')
     else:
-        inkName, inkTags, inkDescription, inkAvailability = chooser.get_ink_description(ink)
+        inkName, inkTags, inkDescription, inkAvailability = stats.get_ink_description(ink)
 
         print('\033[1m%s (%s)\033[0m' % (inkName, inkTags))
         print(fill(inkDescription))

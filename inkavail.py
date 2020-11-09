@@ -26,7 +26,7 @@ from orgmodeparser import *
 import re
 
 
-VERSION = '1.0.3'
+VERSION = '1.0.4'
 TITLE = 'InkAvail'
 TITLE_VERSION = '%s v%s' % (TITLE, VERSION)
 
@@ -371,6 +371,50 @@ class InkNodeStatistics():
             self.__process_tagstat_directive(dvalue)
         elif dname == 'TAGNAMES':
             self.__process_tagnames_directive(dvalue)
+
+    def get_ink_description(self, ink):
+        """Получение описания чернил.
+
+        Параметры:
+            ink         - экземпляр OrgHeadlineNode.
+
+        Возвращает кортеж из четырёх строк:
+        'название', 'отсортированный список человекочитаемых меток',
+        'описание', 'наличие'."""
+
+        if not isinstance(ink, OrgHeadlineNode):
+            raise TypeError('get_ink_description(ink): "ink" must be OrgHeadlineNode')
+
+        if 'ink' not in ink.tags:
+            raise ValueError('get_ink_description(ink): "ink" must contain ink description')
+
+        desc = []
+
+        for chld in ink.children:
+            if isinstance(chld, OrgTextNode):
+                desc.append(chld.text)
+
+        avails = []
+
+        if ink.availMl > 0.0:
+            if ink.availMl < 500.0:
+                avs = '%.f мл' % ink.availMl
+            else:
+                avs = '%.2f л' % (ink.availMl / 1000.0)
+            avails.append(avs)
+
+        if ink.availCartridges:
+            avails.append('картриджи')
+
+        # некоторый костылинг
+        disptags = ink.tags.copy()
+        # удаляем служебную метку - она нужна при загрузке БД, не для отображения
+        disptags.remove('ink')
+
+        return (ink.text,
+                ', '.join(sorted(map(lambda tag: self.tagNames[tag] if tag in self.tagNames else tag, disptags))),
+                '\n'.join(desc),
+                ' и '.join(avails))
 
 
 def print_table(headers, printheader, table):
