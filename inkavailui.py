@@ -26,6 +26,8 @@ from gi.repository.GLib import markup_escape_text
 
 import sys
 import os.path
+from shutil import which
+from subprocess import run as subprocess_run
 
 from inkavail import *
 from inkrandom import RandomInkChooser
@@ -62,21 +64,29 @@ class MainWnd():
         self.pages = uibldr.get_object('pages')
 
         self.totalstatlstore, self.totalstatview = get_ui_widgets(uibldr,
-            ('totalstatlstore', 'totalstatview'))
+            'totalstatlstore', 'totalstatview')
 
         self.detailstatststore, self.detailstatsview = get_ui_widgets(uibldr,
-            ('detailstatststore', 'detailstatsview'))
+            'detailstatststore detailstatsview')
 
         self.openorgfiledlg = uibldr.get_object('openorgfiledlg')
 
         self.randominkname, self.randominktags, self.randominkdesc, self.randominkavail = get_ui_widgets(uibldr,
-            ('randominkname', 'randominktags', 'randominkdesc', 'randominkavail'))
+            'randominkname randominktags randominkdesc randominkavail')
         self.randominkdescbuf = self.randominkdesc.get_buffer()
 
         # грязный хакЪ из-за ошибки в Glade 3.22.2, криво генерирующей элементы меню со значками
         mnuFile = uibldr.get_object('mnuFile')
         img = Gtk.Image.new_from_icon_name('open-menu-symbolic', Gtk.IconSize.MENU)
         mnuFile.add(img)
+
+        #
+        self.includetagstxt, self.excludetagstxt, self.taglistpopover, self.taglistpopoverhdr = get_ui_widgets(uibldr,
+            'includetagstxt', 'excludetagstxt', 'taglistpopover', 'taglistpopoverhdr')
+
+        #
+        mnuFileEdit = uibldr.get_object('mnuFileEdit')
+        self.emacs = which('emacs')
 
         #
         uibldr.connect_signals(self)
@@ -149,7 +159,7 @@ class MainWnd():
                 inknamet = '<b>%s</b>' % markup_escape_text(inkName)
                 inktagst = markup_escape_text(inkTags) if inkTags else '-'
                 inkdesct = inkDescription
-                inkavailt = 'В наличии: %s' % markup_escape_text(inkAvailability)
+                inkavailt = markup_escape_text(inkAvailability)
 
         self.randominkname.set_markup(inknamet)
         self.randominktags.set_markup(inktagst)
@@ -176,6 +186,47 @@ class MainWnd():
                 self.load_db()
 
             self.pages.set_current_page(self.PAGE_STAT)
+
+    def mnuFileEdit_activate(self, wgt):
+        if not self.emacs:
+            msg_dialog(self.window,
+                       TITLE,
+                       'Для редактирования БД требуется редактор Emacs')
+        else:
+            try:
+                # чисто для подстраховки - один фиг GTK main loop залипнет
+                # во время работы subprocess_run()
+                self.window.set_sensitive(False)
+                try:
+                    flush_gtk_events()
+                    p = subprocess_run([self.emacs, '--no-desktop', '--no-splash', self.dbfname])
+
+                    if p.returncode != 0:
+                        msg_dialog(self.window, TITLE, 'Редактор БД завершился с ошибкой.')
+                    else:
+                        self.load_ink_db(self.dbfname)
+                finally:
+                    self.window.set_sensitive(True)
+            except Exception as ex:
+                print('* %s' % str(ex), file=sys.stderr)
+                msg_dialog(self.window, TITLE, 'Сбой запуска редактора БД')
+
+    def select_tags(self, parentwidget, title):
+        self.taglistpopoverhdr.set_text(title)
+        self.taglistpopover.set_relative_to(parentwidget)
+        self.taglistpopover.show()
+
+    def taglistokbtn_clicked(self, btn):
+        self.taglistpopover.hide()
+
+    def taglistcancelbtn_clicked(self, btn):
+        self.taglistpopover.hide()
+
+    def includetagsbtn_clicked(self, btn):
+        self.select_tags(btn, 'Использовать только метки:')
+
+    def excludetagsbtn_clicked(self, btn):
+        self.select_tags(btn, 'Исключать метки:')
 
     def main(self):
         Gtk.main()

@@ -36,7 +36,7 @@ from sys import stderr, argv
 import os.path
 
 
-REVISION = 20200801
+REVISION = 20201109
 
 
 def get_widget_base_unit():
@@ -85,20 +85,35 @@ def load_system_icon(name, size, pixelsize=False):
 MENU_ICON_SIZE_PIXELS =  Gtk.IconSize.lookup(Gtk.IconSize.MENU)[1]
 
 
-def get_ui_widgets(builder, names):
+def get_ui_widgets(builder, *names):
     """Получение списка указанных виджетов.
     builder     - экземпляр класса Gtk.Builder,
-    names       - список или кортеж имён виджетов.
+    names       - строки с имёнами виджетов,
+                  в виде 'имя', 'имя1', 'имяN'
+                  и/или ('имя', 'имя1', 'имяN')
+                  и/или 'имя имя1 имяN'.
     Возвращает список экземпляров Gtk.Widget и т.п."""
 
     widgets = []
 
-    for wname in names:
-        wgt = builder.get_object(wname)
-        if wgt is None:
-            raise KeyError('get_ui_widgets(): экземпляр Gtk.Builder не содержит виджет с именем "%s"' % wname)
+    def __parse_params(plst):
+        for param in plst:
+            if isinstance(param, list) or isinstance(param, tuple):
+                __parse_params(param)
+            elif isinstance(param, str):
+                param = param.split(None)
+                if len(param) > 1:
+                    __parse_params(param)
+                else:
+                    wgt = builder.get_object(param[0])
+                    if wgt is None:
+                        raise KeyError('get_ui_widgets(): экземпляр Gtk.Builder не содержит виджет с именем "%s"' % param[0])
 
-        widgets.append(wgt)
+                    widgets.append(wgt)
+            else:
+                raise ValueError('get_ui_widgets(): недопустимый тип элемента в списке имён виджетов')
+
+    __parse_params(names)
 
     return widgets
 
