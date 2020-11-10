@@ -75,7 +75,7 @@ class RandomInkChooser():
             if excludetags and not inkTags.isdisjoint(excludetags):
                 return False
 
-            if includetags and not inkTags.isdisjoint(includetags):
+            if includetags and inkTags.isdisjoint(includetags):
                 return False
 
             return True
@@ -98,7 +98,7 @@ class RandomInkChooser():
                 if ink != self.lastChoice:
                     break
         elif self.nInks == 1:
-            ink = self.nInks[0]
+            ink = self.inks[0]
         else:
             ink = None
 

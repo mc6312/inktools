@@ -17,7 +17,7 @@
   <object class="GtkImage" id="excludetagsbtnimg">
     <property name="visible">True</property>
     <property name="can_focus">False</property>
-    <property name="icon_name">list-remove</property>
+    <property name="icon_name">list-remove-symbolic</property>
   </object>
   <object class="GtkFileFilter" id="filefilterOrgMode">
     <patterns>
@@ -99,95 +99,7 @@
   <object class="GtkImage" id="includetagsbtnimg">
     <property name="visible">True</property>
     <property name="can_focus">False</property>
-    <property name="icon_name">list-add</property>
-  </object>
-  <object class="GtkPopover" id="taglistpopover">
-    <property name="can_focus">False</property>
-    <property name="border_width">4</property>
-    <property name="transitions_enabled">False</property>
-    <child>
-      <object class="GtkBox">
-        <property name="visible">True</property>
-        <property name="can_focus">False</property>
-        <property name="orientation">vertical</property>
-        <property name="spacing">4</property>
-        <child>
-          <object class="GtkLabel" id="taglistpopoverhdr">
-            <property name="visible">True</property>
-            <property name="can_focus">False</property>
-            <property name="label" translatable="yes">...</property>
-          </object>
-          <packing>
-            <property name="expand">False</property>
-            <property name="fill">True</property>
-            <property name="position">0</property>
-          </packing>
-        </child>
-        <child>
-          <object class="GtkScrolledWindow" id="taglistsw">
-            <property name="visible">True</property>
-            <property name="can_focus">True</property>
-            <property name="shadow_type">in</property>
-            <property name="min_content_width">256</property>
-            <property name="min_content_height">192</property>
-            <child>
-              <placeholder/>
-            </child>
-          </object>
-          <packing>
-            <property name="expand">False</property>
-            <property name="fill">True</property>
-            <property name="position">1</property>
-          </packing>
-        </child>
-        <child>
-          <object class="GtkBox">
-            <property name="visible">True</property>
-            <property name="can_focus">False</property>
-            <property name="spacing">4</property>
-            <child>
-              <object class="GtkButton" id="taglistcancelbtn">
-                <property name="label" translatable="yes">Отмена</property>
-                <property name="visible">True</property>
-                <property name="can_focus">True</property>
-                <property name="receives_default">True</property>
-                <signal name="clicked" handler="taglistcancelbtn_clicked" swapped="no"/>
-              </object>
-              <packing>
-                <property name="expand">False</property>
-                <property name="fill">True</property>
-                <property name="position">0</property>
-              </packing>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <object class="GtkButton" id="taglistokbtn">
-                <property name="label" translatable="yes">ОК</property>
-                <property name="visible">True</property>
-                <property name="can_focus">True</property>
-                <property name="receives_default">True</property>
-                <signal name="clicked" handler="taglistokbtn_clicked" swapped="no"/>
-                <style>
-                  <class name="suggested-action"/>
-                </style>
-              </object>
-              <packing>
-                <property name="expand">False</property>
-                <property name="fill">True</property>
-                <property name="position">2</property>
-              </packing>
-            </child>
-          </object>
-          <packing>
-            <property name="expand">False</property>
-            <property name="fill">True</property>
-            <property name="position">2</property>
-          </packing>
-        </child>
-      </object>
-    </child>
+    <property name="icon_name">list-add-symbolic</property>
   </object>
   <object class="GtkListStore" id="totalstatlstore">
     <columns>
@@ -384,7 +296,6 @@
                     <property name="can_focus">True</property>
                     <property name="hscrollbar_policy">never</property>
                     <property name="shadow_type">in</property>
-                    <property name="min_content_height">256</property>
                     <child>
                       <object class="GtkTreeView" id="detailstatsview">
                         <property name="visible">True</property>
@@ -631,6 +542,7 @@
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="receives_default">True</property>
+                            <property name="tooltip_text" translatable="yes">Включать в подборку</property>
                             <property name="image">includetagsbtnimg</property>
                             <signal name="clicked" handler="includetagsbtn_clicked" swapped="no"/>
                           </object>
@@ -658,6 +570,7 @@
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="receives_default">True</property>
+                            <property name="tooltip_text" translatable="yes">Исключать из подборки</property>
                             <property name="image">excludetagsbtnimg</property>
                             <signal name="clicked" handler="excludetagsbtn_clicked" swapped="no"/>
                           </object>
@@ -744,5 +657,73 @@
         </child>
       </object>
     </child>
+  </object>
+  <object class="GtkDialog" id="tagchooserdlg">
+    <property name="can_focus">False</property>
+    <property name="modal">True</property>
+    <property name="window_position">center-on-parent</property>
+    <property name="type_hint">dialog</property>
+    <property name="skip_taskbar_hint">True</property>
+    <property name="skip_pager_hint">True</property>
+    <property name="transient_for">inkavailwnd</property>
+    <child type="titlebar">
+      <placeholder/>
+    </child>
+    <child internal-child="vbox">
+      <object class="GtkBox">
+        <property name="can_focus">False</property>
+        <property name="orientation">vertical</property>
+        <property name="spacing">2</property>
+        <child internal-child="action_area">
+          <object class="GtkButtonBox">
+            <property name="can_focus">False</property>
+            <property name="layout_style">end</property>
+            <child>
+              <object class="GtkButton" id="tccancelbtn">
+                <property name="label" translatable="yes">Отмена</property>
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="receives_default">False</property>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+                <property name="position">0</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkButton" id="tcokbtn">
+                <property name="label" translatable="yes">ОК</property>
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="can_default">True</property>
+                <property name="has_default">True</property>
+                <property name="receives_default">True</property>
+                <style>
+                  <class name="suggested-action"/>
+                </style>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+                <property name="position">1</property>
+              </packing>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+            <property name="position">0</property>
+          </packing>
+        </child>
+        <child>
+          <placeholder/>
+        </child>
+      </object>
+    </child>
+    <action-widgets>
+      <action-widget response="-6">tccancelbtn</action-widget>
+      <action-widget response="-5">tcokbtn</action-widget>
+    </action-widgets>
   </object>
 </interface>

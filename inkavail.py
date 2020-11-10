@@ -26,7 +26,7 @@ from orgmodeparser import *
 import re
 
 
-VERSION = '1.0.4'
+VERSION = '1.0.5'
 TITLE = 'InkAvail'
 TITLE_VERSION = '%s v%s' % (TITLE, VERSION)
 
@@ -179,6 +179,14 @@ class InkNodeStatistics():
         self.tagNames = {}
 
         self.scan_node(rootnode, 0)
+
+        # список всех меток
+        self.tags = []
+
+        # ищем ветви типа OrgDirectiveNode только на верхнем уровне
+        for node in rootnode.children:
+            if isinstance(node, OrgDirectiveNode) and node.name == 'TAGS':
+                self.tags += node.text.split(None)
 
     def get_total_result_table(self):
         """Возвращает список списков, содержащих строки

@@ -36,25 +36,30 @@ from sys import stderr, argv
 import os.path
 
 
-REVISION = 20201109
+REVISION = 20201110
 
 
-def get_widget_base_unit():
-    """Возвращает базовое значение, которое можно использовать для расчета
+def get_widget_base_units():
+    """Получение базовых значений, которые можно использовать для расчета
     отступов между виджетами и т.п., дабы несчастного пользователя
     не вывернуло от пионерского вида гуя.
-    Значение считаем на основе размера шрифта по умолчанию, так как
-    прицепиться больше не к чему."""
+    Значения считаем на основе размера шрифта по умолчанию, так как
+    прицепиться больше не к чему.
+    Возвращает кортеж из двух элементов - средней ширины символа
+    и высоты строки. Оба значения в пикселах."""
 
     pangoContext = Gdk.pango_context_get()
-    return int(pangoContext.get_metrics(pangoContext.get_font_description(),
-        None).get_approximate_char_width() / Pango.SCALE)
+    metrics = pangoContext.get_metrics(pangoContext.get_font_description(),
+        None)
+
+    return (int(metrics.get_approximate_char_width() / Pango.SCALE),
+            int(metrics.get_height() / Pango.SCALE))
 
 
-WIDGET_BASE_UNIT = get_widget_base_unit()
+WIDGET_BASE_WIDTH, WIDGET_BASE_HEIGHT = get_widget_base_units()
 
 # обычный интервал между виджетами (напр. внутри Gtk.Box)
-WIDGET_SPACING = WIDGET_BASE_UNIT // 2
+WIDGET_SPACING = WIDGET_BASE_WIDTH // 2
 # меньше делать будет бессмысленно
 if WIDGET_SPACING < 4:
     WIDGET_SPACING = 4

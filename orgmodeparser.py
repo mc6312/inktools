@@ -418,8 +418,7 @@ class MinimalOrgParser(OrgNode):
 
 
 def __debug_sample():
-    fname = 'sample.org'
-    #fname = 'bigsample.org'
+    fname = 'inks.org'
     rootnode = MinimalOrgParser(fname)
 
     print(rootnode.dumps(1))

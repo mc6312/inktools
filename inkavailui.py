@@ -24,6 +24,8 @@ from gtktools import *
 from gi.repository import Gtk #, Gdk, GObject, Pango, GLib
 from gi.repository.GLib import markup_escape_text
 
+from gtkchecklistbox import CheckListBox
+
 import sys
 import os.path
 from shutil import which
@@ -35,6 +37,9 @@ from inkrandom import RandomInkChooser
 
 class MainWnd():
     PAGE_STAT, PAGE_CHOICE = range(2)
+
+    INCLUDE_ANY = 'любые'
+    EXCLUDE_NOTHING = 'никаких'
 
     def wnd_destroy(self, widget):
         Gtk.main_quit()
@@ -48,6 +53,10 @@ class MainWnd():
         self.db = None
         self.rndchooser = None
         self.stats = None
+
+        # для выбора в случайном выбираторе
+        self.includetags = set()
+        self.excludetags = set()
 
         #
         # основное окно
@@ -66,8 +75,11 @@ class MainWnd():
         self.totalstatlstore, self.totalstatview = get_ui_widgets(uibldr,
             'totalstatlstore', 'totalstatview')
 
-        self.detailstatststore, self.detailstatsview = get_ui_widgets(uibldr,
-            'detailstatststore detailstatsview')
+        self.detailstatststore, self.detailstatsview, detailstatswnd = get_ui_widgets(uibldr,
+            'detailstatststore detailstatsview detailstatswnd')
+
+        # костылинг
+        detailstatswnd.set_min_content_height(WIDGET_BASE_HEIGHT * 24)
 
         self.openorgfiledlg = uibldr.get_object('openorgfiledlg')
 
@@ -81,8 +93,18 @@ class MainWnd():
         mnuFile.add(img)
 
         #
-        self.includetagstxt, self.excludetagstxt, self.taglistpopover, self.taglistpopoverhdr = get_ui_widgets(uibldr,
-            'includetagstxt', 'excludetagstxt', 'taglistpopover', 'taglistpopoverhdr')
+        self.includetagstxt, self.excludetagstxt, self.tagchooserdlg = get_ui_widgets(uibldr,
+            'includetagstxt', 'excludetagstxt', 'tagchooserdlg')
+
+        self.tagchecklistbox = CheckListBox(selectionbuttons=True)
+        # костыль
+        # потому что set_min_content_width с какого-то хрена не работает
+        self.tagchecklistbox.scwindow.set_size_request(WIDGET_BASE_WIDTH * 80, WIDGET_BASE_HEIGHT * 10)
+        #self.tagchecklistbox.scwindow.set_min_content_width(WIDGET_BASE_WIDTH * 90)
+        #self.tagchecklistbox.scwindow.set_min_content_height(WIDGET_BASE_HEIGHT * 16)
+
+        taglistvbox = self.tagchooserdlg.get_content_area()
+        taglistvbox.pack_start(self.tagchecklistbox, True, True, 0)
 
         #
         mnuFileEdit = uibldr.get_object('mnuFileEdit')
@@ -107,6 +129,7 @@ class MainWnd():
             self.stats = get_ink_stats(self.db)
             self.rndchooser = None
 
+            # статистика
             if self.stats:
                 dfname = os.path.split(self.dbfname)[-1]
 
@@ -129,6 +152,36 @@ class MainWnd():
             else:
                 dfname = ''
 
+            #
+            # метки
+            #
+            self.tagchecklistbox.clear_items()
+
+            def __add_tag(tagname):
+                tagdisp = tagname if tagname not in self.stats.tagNames else self.stats.tagNames[tagname]
+                self.tagchecklistbox.add_item(False, tagdisp, tagname)
+
+            # в первую очередь используем только метки, учитываемые в статистике
+            ntags = 0
+
+            for tsinfo in self.stats.tagStats:
+                for tagname in sorted(tsinfo.tags):
+                    __add_tag(tagname)
+                    ntags += 1
+
+            # ...а вот если там меток не было - берём весь список меток
+            if not ntags:
+                for tagname in sorted(self.stats.tags):
+                    __add_tag(tagname)
+
+            self.includetags.clear() # пустое множество - выбирать все
+            self.excludetags.clear() # пустое множество - не исключать ничего
+
+            self.includetagstxt.set_text(self.INCLUDE_ANY)
+            self.excludetagstxt.set_text(self.EXCLUDE_NOTHING)
+
+            #
+
             self.openorgfiledlg.select_filename(self.dbfname)
             self.headerbar.set_subtitle(dfname)
 
@@ -145,7 +198,8 @@ class MainWnd():
             inkdesct = ''
             inkavailt = ''
         else:
-            #TODO присобачить выбор меток
+            self.rndchooser.filter_inks(self.excludetags, self.includetags)
+
             ink = self.rndchooser.choice()
 
             if not ink:
@@ -211,22 +265,39 @@ class MainWnd():
                 print('* %s' % str(ex), file=sys.stderr)
                 msg_dialog(self.window, TITLE, 'Сбой запуска редактора БД')
 
-    def select_tags(self, parentwidget, title):
-        self.taglistpopoverhdr.set_text(title)
-        self.taglistpopover.set_relative_to(parentwidget)
-        self.taglistpopover.show()
+    def select_tags(self, title, selfrom, disp, noselstr):
+        """title    - строка с заголовком окна,
+        selfrom     - list или set для чекбоксов (см. CheckListBox.set_selection()),
+        disp        - экземпляр Gtk.Label для отображения результатов выбора;
+        noselstr    - строка, которая должна отображаться, если в
+                      CheckListBox не выбрано ни одного элемента."""
 
-    def taglistokbtn_clicked(self, btn):
-        self.taglistpopover.hide()
+        self.tagchooserdlg.set_title(title)
+        self.tagchooserdlg.show_all()
+        self.tagchecklistbox.set_selection(selfrom)
+        r = self.tagchooserdlg.run()
+        self.tagchooserdlg.hide()
 
-    def taglistcancelbtn_clicked(self, btn):
-        self.taglistpopover.hide()
+        if r == Gtk.ResponseType.OK:
+            disps = self.tagchecklistbox.get_selection_titles()
+            dt = ', '.join(disps) if disps else noselstr
+            disp.set_text(dt)
+
+            return self.tagchecklistbox.get_selection()
+        else:
+            return selfrom
 
     def includetagsbtn_clicked(self, btn):
-        self.select_tags(btn, 'Использовать только метки:')
+        self.includetags = self.select_tags('Использовать только метки:',
+            self.includetags,
+            self.includetagstxt,
+            self.INCLUDE_ANY)
 
     def excludetagsbtn_clicked(self, btn):
-        self.select_tags(btn, 'Исключать метки:')
+        self.excludetags = self.select_tags('Исключать метки:',
+            self.excludetags,
+            self.excludetagstxt,
+            self.EXCLUDE_NOTHING)
 
     def main(self):
         Gtk.main()
