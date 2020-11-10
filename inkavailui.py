@@ -29,7 +29,7 @@ from gtkchecklistbox import CheckListBox
 import sys
 import os.path
 from shutil import which
-from subprocess import run as subprocess_run
+from subprocess import Popen
 
 from inkavail import *
 from inkrandom import RandomInkChooser
@@ -107,8 +107,9 @@ class MainWnd():
         taglistvbox.pack_start(self.tagchecklistbox, True, True, 0)
 
         #
-        mnuFileEdit = uibldr.get_object('mnuFileEdit')
+        #mnuFileEdit = uibldr.get_object('mnuFileEdit')
         self.emacs = which('emacs')
+        self.emacsProcess = None
 
         #
         uibldr.connect_signals(self)
@@ -227,7 +228,7 @@ class MainWnd():
         self.choose_random_ink()
         self.pages.set_current_page(self.PAGE_CHOICE)
 
-    def mnuFileOpen_activate(self, mi):
+    def select_load_db(self):
         self.openorgfiledlg.show_all()
         r = self.openorgfiledlg.run()
         self.openorgfiledlg.hide()
@@ -241,29 +242,47 @@ class MainWnd():
 
             self.pages.set_current_page(self.PAGE_STAT)
 
+    def mnuFileOpen_activate(self, mi):
+        self.select_load_db()
+
+    def mnuFileReload_activate(self, mi):
+        if not self.dbfname:
+            self.select_load_db()
+        else:
+            self.load_db()
+
     def mnuFileEdit_activate(self, wgt):
-        if not self.emacs:
+        self.start_editor()
+
+    def __emacs_is_running(self):
+        if self.emacsProcess is None:
+            return False
+        else:
+            r = self.emacsProcess.poll()
+            if r is None:
+                return True
+            else:
+                self.emacsProcess = None
+                return False
+
+    def start_editor(self):
+        def __msg(what):
             msg_dialog(self.window,
                        TITLE,
-                       'Для редактирования БД требуется редактор Emacs')
+                       what)
+
+        if not self.dbfname:
+            __msg('Файл БД не выбран. Сначала выберите его...')
+        elif not self.emacs:
+            __msg('Для редактирования БД требуется редактор Emacs')
+        elif self.__emacs_is_running():
+            __msg('Редактор БД уже работает')
         else:
             try:
-                # чисто для подстраховки - один фиг GTK main loop залипнет
-                # во время работы subprocess_run()
-                self.window.set_sensitive(False)
-                try:
-                    flush_gtk_events()
-                    p = subprocess_run([self.emacs, '--no-desktop', '--no-splash', self.dbfname])
-
-                    if p.returncode != 0:
-                        msg_dialog(self.window, TITLE, 'Редактор БД завершился с ошибкой.')
-                    else:
-                        self.load_ink_db(self.dbfname)
-                finally:
-                    self.window.set_sensitive(True)
+                self.emacsProcess = Popen([self.emacs, '--no-desktop', '--no-splash', self.dbfname])
             except Exception as ex:
                 print('* %s' % str(ex), file=sys.stderr)
-                msg_dialog(self.window, TITLE, 'Сбой запуска редактора БД')
+                __msg('Сбой запуска редактора БД')
 
     def select_tags(self, title, selfrom, disp, noselstr):
         """title    - строка с заголовком окна,

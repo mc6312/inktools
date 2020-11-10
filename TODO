@@ -16,7 +16,7 @@ inkavail.py
 
 inkavailui.py
   MainWnd.load_db()
-    149: когда-нибудь потом прикрутить тэги для выбора
+    150: когда-нибудь потом прикрутить тэги для выбора
 
 inkrandom.py
   __rc_main()
