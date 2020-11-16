@@ -26,7 +26,7 @@ from orgmodeparser import *
 import re
 
 
-VERSION = '1.0.5'
+VERSION = '1.1.0'
 TITLE = 'InkAvail'
 TITLE_VERSION = '%s v%s' % (TITLE, VERSION)
 
