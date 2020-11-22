@@ -56,6 +56,8 @@ class MainWnd():
 
     MAX_COLOR_SAMPLES = 32
 
+    DET_COL_LABEL, DET_COL_AVAIL, DET_COL_UNAVAIL, DET_COL_UNWANTED, DET_COL_COLOR = range(5)
+
     SAMPLE_COL_VALUE, SAMPLE_COL_HINT, SAMPLE_COL_PIX = range(3)
 
     COPY_RGB, COPY_HEX, COPY_HLS = range(3)
@@ -97,6 +99,8 @@ class MainWnd():
         #
         # страница статистики
         #
+        self.nocoloricon = resldr.load_pixbuf_icon_size('nocolor.svg', Gtk.IconSize.MENU, 'computer')
+
         self.totalstatlstore, self.totalstatview = get_ui_widgets(uibldr,
             'totalstatlstore', 'totalstatview')
 
@@ -205,6 +209,11 @@ class MainWnd():
         self.detailstatsview.set_model(None)
         self.detailstatststore.clear()
 
+        expand = []
+
+        def __bool_s(b):
+            return '√' if b else ''
+
         try:
             self.db = load_ink_db(self.dbfname)
             self.stats = get_ink_stats(self.db)
@@ -222,10 +231,28 @@ class MainWnd():
 
                 # детали
                 for tagstat in self.stats.tagStats:
-                    itr = self.detailstatststore.append(None, (tagstat.title, '', '', ''))
+                    itr = self.detailstatststore.append(None, (tagstat.title, '', '', '', None))
 
-                    for row in tagstat.get_stat_table():
-                        self.detailstatststore.append(itr, row)
+                    expand.append(self.detailstatststore.get_path(itr))
+
+                    for tag, nfo in sorted(tagstat.stats.items(), key=lambda r: r[1].available, reverse=True):
+                        row = (self.stats.get_tag_display_name(tag),
+                            *nfo.counter_strs(), None)
+
+                        subitr = self.detailstatststore.append(itr, row)
+
+                        for ink in sorted(nfo.inks, key=lambda i: i.text):
+                            if ink.color:
+                                pbuf = Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, self.samplePixbufSize, self.samplePixbufSize)
+                                pbuf.fill(int(self.ColorValue.get_rgb32_value(ink.color)))
+                            else:
+                                pbuf = self.nocoloricon
+
+                            self.detailstatststore.append(subitr, (ink.text,
+                                    __bool_s(ink.avail),
+                                    __bool_s(not ink.avail),
+                                    __bool_s(ink.done is None),
+                                    pbuf))
 
                 #TODO когда-нибудь потом прикрутить тэги для выбора
                 self.rndchooser = RandomInkChooser(self.stats, None, None)
@@ -268,7 +295,10 @@ class MainWnd():
 
         finally:
             self.detailstatsview.set_model(self.detailstatststore)
-            self.detailstatsview.expand_all()
+
+            for path in expand:
+                self.detailstatsview.expand_row(path, False)
+
             self.totalstatview.set_model(self.totalstatlstore)
 
         self.choose_random_ink()
@@ -453,6 +483,14 @@ class MainWnd():
             которое можно скормить Pixbuf.fill()."""
 
             return (r << 24) | (g << 16) | (b << 8) | 0xff
+
+        @staticmethod
+        def get_rgb32_value(v):
+            """Возвращает 32-битное значение вида 0xRRGGBBAA,
+            которое можно скормить Pixbuf.fill().
+            Используются 24 бита значения v."""
+
+            return ((v & 0xffffff) << 8) | 0xff
 
         def __int__(self):
             return self.get_int_value(self.r, self.g, self.b)

@@ -26,7 +26,7 @@ from orgmodeparser import *
 import re
 
 
-VERSION = '1.1.0'
+VERSION = '1.2.0'
 TITLE = 'InkAvail'
 TITLE_VERSION = '%s v%s' % (TITLE, VERSION)
 
@@ -81,16 +81,23 @@ RX_AVAIL_CR = re.compile('.*картридж.*', re.UNICODE|re.IGNORECASE)
 
 class TagStatInfo():
     class TagStatValue():
-        __slots__ = 'available', 'unavailable', 'unwanted'
+        __slots__ = 'available', 'unavailable', 'unwanted', 'inks'
 
         def __init__(self):
             self.available = 0
             self.unavailable = 0
             self.unwanted = 0
+            self.inks = [] # список всех экземпляров OrgHeadlineNode, соответствующих тэгу
 
         def __repr__(self):
-            return '%s(available=%d, unavailable=%d, unwanted=%d)' % (self.__class__.__name__,
-                self.available, self.unavailable, self.unwanted)
+            return '%s(available=%d, unavailable=%d, unwanted=%d, inks=%s)' % (self.__class__.__name__,
+                self.available, self.unavailable, self.unwanted, self.inks)
+
+        def counter_strs(self):
+            def __to_str(i):
+                return '-' if i == 0 else str(i)
+
+            return (__to_str(self.available), __to_str(self.unavailable), __to_str(self.unwanted))
 
     def __init__(self, totals, title, col1title, tags):
         """Параметры:
@@ -131,30 +138,7 @@ class TagStatInfo():
             if inknode.done is None:
                 nfo.unwanted += 1
 
-    def get_stat_table(self):
-        """Возвращает список списков, содержащих строки со
-        значениями статистических данных.
-
-        Столбцы:
-        1. в первой строке таблицы - название таблицы,
-           в следующих - человекочитаемое название метки;
-        2, 3, 4: в первой строке таблицы - заголовки столбцов;
-           в следующих - значения счётчиков."""
-
-        table = []
-
-        def __to_str(i):
-            return '-' if i == 0 else str(i)
-
-        for tag, nfo in sorted(self.stats.items(), key=lambda r: r[1].available, reverse=True):
-            row = [self.totalstats.tagNames[tag] if tag in self.totalstats.tagNames else tag,
-                   __to_str(nfo.available),
-                   __to_str(nfo.unavailable),
-                   __to_str(nfo.unwanted)]
-
-            table.append(row)
-
-        return table
+            nfo.inks.append(inknode)
 
 
 class InkNodeStatistics():
@@ -187,6 +171,9 @@ class InkNodeStatistics():
         for node in rootnode.children:
             if isinstance(node, OrgDirectiveNode) and node.name == 'TAGS':
                 self.tags += node.text.split(None)
+
+    def get_tag_display_name(self, tag):
+        return self.tagNames[tag] if tag in self.tagNames else tag
 
     def get_total_result_table(self):
         """Возвращает список списков, содержащих строки
@@ -229,6 +216,8 @@ class InkNodeStatistics():
             self.unwantedInks,
             self.tagStats)
 
+    __RX_INK_COLOR = re.compile('^цвет:\s+#([0-9,a-f]{6})$', re.UNICODE|re.IGNORECASE)
+
     def get_ink_node_statistics(self, node):
         """Сбор статистики для node, если это OrgHeadlineNode с описание
         чернил.
@@ -243,6 +232,12 @@ class InkNodeStatistics():
             return False
 
         # это "чернильный" элемент дерева - его содержимым кормим статистику
+
+        # 0. обрабатываем служебные слова в тексте ветви
+        tnode, rm = node.find_text_node_by_regex(self.__RX_INK_COLOR)
+
+        # цвет чернил - в документе не хранится, используется только статистикой
+        node.color = int(rm.group(1), 16) if rm else None
 
         # 1. собираем статистику по наличию чернил
 
@@ -461,20 +456,6 @@ def print_table(headers, printheader, table):
         print(tabfmt.format(*r))
 
 
-def print_total_statistics(stats):
-    totals = stats.get_total_result_table()
-
-    print_table((('', '<'), ('', '>'), ('', '>'), ('', '>')),
-        False,
-        totals)
-
-
-def print_tag_statistics(stats):
-    for tagstat in stats.tagStats:
-        print('\n%s' % tagstat.title)
-        print_table(((tagstat.col1title, '<'), ('Есть', '>'), ('Нет', '>'), ('Н/н', '>')),
-                    True,
-                    tagstat.get_stat_table())
 
 
 def load_ink_db(fname):
@@ -488,6 +469,7 @@ def load_ink_db(fname):
 
     #print(f'Загружаю {fname}')
     return MinimalOrgParser(fname)
+
 
 def get_ink_stats(db):
     return InkNodeStatistics(db) if db is not None else None
@@ -504,18 +486,22 @@ def process_cmdline():
     return fname
 
 
-def __term_main():
+def __test_stats():
     #TODO присобачить файл настроек с указанием файла БД
 
     print('%s\n' % TITLE_VERSION)
 
     stats = get_ink_stats(load_ink_db(process_cmdline()))
     if stats:
-        print_total_statistics(stats)
-        print_tag_statistics(stats)
+        print(stats.get_total_result_table())
+
+        for tagstat in stats.tagStats:
+            print('\n%s' % tagstat.title)
+            print(tagstat.stats)
 
     return 0
 
 
 if __name__ == '__main__':
-    sys.exit(__term_main())
+    print('[testing %s]' % __file__)
+    __test_stats()

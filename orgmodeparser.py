@@ -27,7 +27,7 @@ import os.path
 import re
 
 
-VERSION = '0.5'
+VERSION = '0.6'
 
 
 class OrgNode():
@@ -41,6 +41,23 @@ class OrgNode():
         self.text = text
         self.children = []
 
+    def find_text_node_by_regex(self, regex):
+        """Ищет в списке children первый дочерний
+        элемент типа OrgTextNode, поле text которого содержит текст,
+        совпадающий сo скомпилированным регулярным выражением regex.
+        Поиск НЕ рекурсивный.
+        Возвращает кортеж из двух элементов:
+        если находит - (экземпляр OrgTextNode, экземпляр re.matchobject);
+        если не находит - (None, None)."""
+
+        for child in self.children:
+            if isinstance(child, OrgTextNode):
+                m = regex.search(child.text)
+                if m:
+                    return (child, m)
+
+        return (None, None)
+
     def find_child_by_text(self, text, childtype):
         """Ищет в списке children первый дочерний
         элемент, поле text которого равно параметру text,
@@ -51,12 +68,12 @@ class OrgNode():
         Если метод ничего не находит - возвращает None."""
 
         for child in self.children:
-            if child.text != text:
-                continue
-
             # НЕ isinstance(child, childtype) потому, что нужно
             # точное сравнение, а не совпадение класса-потомка с родителем
             if childtype is not None and type(child) is not childtype:
+                continue
+
+            if child.text != text:
                 continue
 
             return child

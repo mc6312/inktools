@@ -8,6 +8,7 @@
 [[https://www.de-profundis-ink.com/][сайт производителя]]
 ** DONE De Profundis Underwater Madness BlackBlue      :blue_black:dark:ink:
 Зеленовато-синевато-чёрные чернила, с хорошо различимым оттенком, по разному выглядящим при разном освещении. Умеренно текучи. Пригодны для повседневного письма.
+цвет: #002030
 *** в наличии
 флакон 35 мл
 ** DONE De Profundis Aquamarine Blue                         :blue:light:ink:
@@ -19,6 +20,7 @@
 ** DONE Обычные [4/4]
 *** DONE Hydrazine Teal                                :gray:blue:dark:ink:
 Зеленовато-сине-серые (или зеленовато-серо-синие) не очень тёмные чернила, с хорошо различимым оттенком. Пригодны для повседневного письма.
+цвет: #204050
 **** в наличии
 нет
 *** DONE Hydrazine Blue Black                     :blue_black:dark:black:ink:
