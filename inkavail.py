@@ -24,9 +24,11 @@ import os.path
 import sys
 from orgmodeparser import *
 import re
+from math import sqrt
+from colorsys import rgb_to_hls
 
 
-VERSION = '1.2.0'
+VERSION = '1.3.0'
 TITLE = 'InkAvail'
 TITLE_VERSION = '%s v%s' % (TITLE, VERSION)
 
@@ -77,6 +79,166 @@ MILLILITERS = 1000.0
 
 RX_AVAIL_ML = re.compile('^флакон\s([\d\.]+)\s?.*?$', re.UNICODE|re.IGNORECASE)
 RX_AVAIL_CR = re.compile('.*картридж.*', re.UNICODE|re.IGNORECASE)
+RX_INK_COLOR = re.compile('^цвет:\s+#([0-9,a-f]{6})$', re.UNICODE|re.IGNORECASE)
+
+
+class ColorValue():
+    # строим велосипед, т.к. Gdk.RGBA с какого-то чорта уродуется внутри Gtk.ListStore
+
+    #__slots__ = 'r', 'g', 'b'
+
+    def __init__(self, r, g, b):
+        self.r = r
+        self.g = g
+        self.b = b
+
+        self.navg = 0
+        self.ravg = 0.0
+        self.gavg = 0.0
+        self.bavg = 0.0
+
+    def __eq__(self, other):
+        return (self.r == other.r) and (self.g == other.g) and (self.b == other.b)
+
+    @staticmethod
+    def get_int_value(r, g, b):
+        """Возвращает 32-битное значение вида 0xRRGGBBAA,
+        которое можно скормить Pixbuf.fill()."""
+
+        return (r << 24) | (g << 16) | (b << 8) | 0xff
+
+    @staticmethod
+    def get_rgb32_value(v):
+        """Возвращает 32-битное значение вида 0xRRGGBBAA,
+        которое можно скормить Pixbuf.fill().
+        Используются 24 бита значения v."""
+
+        return ((v & 0xffffff) << 8) | 0xff
+
+    @classmethod
+    def new_from_rgb24(cls, rgb):
+        """Создаёт экземпляр ColorValue из целого 0xRRGGBB."""
+
+        return cls((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255)
+
+    def __int__(self):
+        return self.get_int_value(self.r, self.g, self.b)
+
+    def __repr__(self):
+        return '%s(r=%d, g=%d, b=%d)' % (self.__class__.__name__,
+            self.r, self.g, self.b)
+
+    def get_values(self):
+        return (self.r, self.g, self.b)
+
+    @staticmethod
+    def get_hex_value(r, g, b):
+        return '#%.2x%.2x%.2x' % (r, g, b)
+
+    def to_hex(self):
+        return self.get_hex_value(self.r, self.g, self.b)
+
+    def to_hls(self):
+        """Преобразование из RGB в HLS.
+
+        Т.к. colorsys.rgb_to_hls() пытается определить диапазон значений
+        (м.б. как 0.0-1.0, так и 0-255) - у этой функции случаются
+        ошибки при значениях <=1, а потому принудительно приводим
+        входные значения к диапазону 0.0-1.0, а выходные - к
+        h: 0-359, l: 0-100, s: 0-100."""
+
+        h, l, s = rgb_to_hls(self.r / 255, self.g / 255, self.b / 255)
+        return (int(round(h * 359)), int(round(l * 100)), int(round(s * 100)))
+
+    HUE_NAMES = (
+        (12,  'красный'),
+        (35,  'оранжевый'),
+        (65,  'жёлтый'),
+        (85,  'жёлто-зелёный'),
+        (135, 'зелёный'),
+        (165, 'бирюзовый'),
+        (215, 'голубой'),
+        (240, 'синий'),
+        (265, 'фиолетово-синий'),
+        (305, 'фиолетовый'),
+        (335, 'красно-фиолетовый'),
+        (360, 'красный'))
+
+    LIGHTNESS_NAMES = (
+        (5,   'близкий к чёрному'),
+        (12,  'очень тёмный'),
+        (20,  'тёмный'),
+        (65,  'светлый'),
+        (100, 'яркий'))
+
+    SATURATION_NAMES = (
+        (5,   'ненасыщенный'),
+        (12,  'слабо насыщенный'),
+        (45,  'средне-насыщенный'),
+        (100,  'насыщенный'))
+
+    def get_description(self):
+        """Возвращает текстовое описание цвета (как умеет, хехе).
+        Соответствие названий цветов и т.п. значениям HLS - чистый
+        авторский произвол.
+        Соответствия Pantone/RAL/... на данный момент нет, и, вероятно,
+        не будет."""
+
+        hue, lightness, saturation = self.to_hls()
+
+        def __getv(fromlst, v):
+            for vrange, vstr in fromlst:
+                if v <= vrange:
+                    return vstr
+
+            return fromlst[-1][1]
+
+        # костыль для тёмных малонасыщенных цветов
+        if saturation <= 3:
+            if lightness <= 4:
+                desc = 'чёрный'
+            elif lightness >= 90:
+                desc = 'белый'
+            else:
+                desc = '%s серый' % __getv(self.LIGHTNESS_NAMES, lightness)
+        else:
+            desc = '%s, %s (%d%%), %s (%d%%)' % (
+                __getv(self.HUE_NAMES, hue),
+                __getv(self.SATURATION_NAMES, saturation), saturation,
+                __getv(self.LIGHTNESS_NAMES, lightness), lightness)
+
+        return '%s; %s' % (self.to_hex(), desc)
+
+    def avg_color_add(self, colorv):
+        """Накопление значений для вычисления среднего цвета.
+        colorv - экземпляр ColorValue."""
+
+        self.ravg += colorv.r * colorv.r
+        self.gavg += colorv.g * colorv.g
+        self.bavg += colorv.b * colorv.b
+
+        self.navg += 1
+
+    def avg_color_reset(self):
+        """Сброс переменных для вычисления среднего цвета."""
+
+        self.navg = 0
+        self.ravg = 0.0
+        self.gavg = 0.0
+        self.bavg = 0.0
+
+    def avg_color_get(self):
+        """Вычисляет среднее значение цвета,
+        на основе значений, добавленных avg_color_add().
+        Если не из чего было считать - возвращает None,
+        иначе - экземпляр ColorValue."""
+
+        if self.navg:
+            return ColorValue(int(sqrt(self.ravg / self.navg)),
+                              int(sqrt(self.gavg / self.navg)),
+                              int(sqrt(self.bavg / self.navg)))
+        else:
+            return
 
 
 class TagStatInfo():
@@ -216,8 +378,6 @@ class InkNodeStatistics():
             self.unwantedInks,
             self.tagStats)
 
-    __RX_INK_COLOR = re.compile('^цвет:\s+#([0-9,a-f]{6})$', re.UNICODE|re.IGNORECASE)
-
     def get_ink_node_statistics(self, node):
         """Сбор статистики для node, если это OrgHeadlineNode с описание
         чернил.
@@ -233,40 +393,68 @@ class InkNodeStatistics():
 
         # это "чернильный" элемент дерева - его содержимым кормим статистику
 
-        # 0. обрабатываем служебные слова в тексте ветви
-        tnode, rm = node.find_text_node_by_regex(self.__RX_INK_COLOR)
+        #
+        # обрабатываем специальные подветви
+        #
 
-        # цвет чернил - в документе не хранится, используется только статистикой
-        node.color = int(rm.group(1), 16) if rm else None
+        def __get_special_text_node(headname):
+            """Ищет ветвь типа OrgHeadlineNode с текстом заголовка headname,
+            нерекурсивно ищет в ней вложенные ветви типа OrgTextNode.
+            Возвращает список экземпляров OrgTextNode, если чего-нибудь
+            находит, иначе - пустой список."""
 
-        # 1. собираем статистику по наличию чернил
+            retl = []
+
+            hlnode = node.find_child_by_text(headname, OrgHeadlineNode)
+            if hlnode:
+                for child in hlnode.children:
+                    # isinstance тут не годится
+                    if type(child) is OrgTextNode:
+                        retl.append(child)
+
+            return retl
+
+
+        #
+        # параметры
+        #
+        node.color = None
+
+        params = __get_special_text_node('параметры')
+        for paramnode in params:
+            # цвет чернил 0xRRGGBB
+            # в документе не хранится, используется только статистикой
+            rm = RX_INK_COLOR.match(paramnode.text)
+
+            if rm:
+                node.color = int(rm.group(1), 16)
+
+        #
+        # наличие
+        #
 
         # в документе не хранится - используется только статистикой
         node.avail = False
         node.availMl = 0.0
         node.availCartridges = False
 
-        availnode = node.find_child_by_text('в наличии', OrgHeadlineNode)
-        if availnode is not None:
-            for child in availnode.children:
-                if type(child) is not OrgTextNode:
-                    continue
+        avails = __get_special_text_node('в наличии')
+        for availnode in avails:
+            rm = RX_AVAIL_ML.match(availnode.text)
+            if rm:
+                try:
+                    avail = float(rm.group(1))
 
-                rm = RX_AVAIL_ML.match(child.text)
+                    node.avail = True
+                    node.availMl += avail
+                    self.availMl += avail
+                except ValueError:
+                    pass
+            else:
+                rm = RX_AVAIL_CR.match(availnode.text)
                 if rm:
-                    try:
-                        avail = float(rm.group(1))
-
-                        node.avail = True
-                        node.availMl += avail
-                        self.availMl += avail
-                    except ValueError:
-                        pass
-                else:
-                    rm = RX_AVAIL_CR.match(child.text)
-                    if rm:
-                        node.avail = True
-                        node.availCartridges = True
+                    node.avail = True
+                    node.availCartridges = True
 
         # Внимание:
         # node.avail НЕ зависит от node.done
@@ -281,7 +469,9 @@ class InkNodeStatistics():
         if node.done == None:
             self.unwantedInks.append(node)
 
-        # 2. скармливаем их статистике "по тэгам"
+        #
+        # скармливаем всё, что следует, статистике "по тэгам"
+        #
         for tagstat in self.tagStats:
             tagstat.gather_statistics(node)
 
@@ -502,6 +692,27 @@ def __test_stats():
     return 0
 
 
+def __test_colordesc():
+    colors = ((0, 0, 0),
+        (255, 255, 255),
+        (255, 0, 0),
+        (255, 192, 0),
+        (0, 0, 255),
+        (0, 192, 255),
+        (255, 0, 255),
+        (20, 20, 20),
+        (20, 20, 50),
+        (96, 96, 255),
+        (192, 192, 255),
+        (96, 220, 255),
+        (240, 240, 255))
+
+    for r, g, b in colors:
+        colorv = ColorValue(r, g, b)
+        print(colorv.to_hex(), colorv.get_description())
+
+
 if __name__ == '__main__':
     print('[testing %s]' % __file__)
-    __test_stats()
+    #__test_stats()
+    __test_colordesc()

@@ -27,7 +27,7 @@ import os.path
 import re
 
 
-VERSION = '0.6'
+VERSION = '0.7'
 
 
 class OrgNode():
@@ -62,10 +62,12 @@ class OrgNode():
         """Ищет в списке children первый дочерний
         элемент, поле text которого равно параметру text,
         и возвращает найденный экземпляр OrgNode.
-        Сравнение регистро-зависимое, поиск НЕ рекурсивный.
+        Сравнение регистро-независимое, поиск НЕ рекурсивный.
         Если параметр childtype не None, проверяются
         также типы дочерних элементов на совпадение с childtype.
         Если метод ничего не находит - возвращает None."""
+
+        text = text.lower()
 
         for child in self.children:
             # НЕ isinstance(child, childtype) потому, что нужно
@@ -73,7 +75,7 @@ class OrgNode():
             if childtype is not None and type(child) is not childtype:
                 continue
 
-            if child.text != text:
+            if child.text.lower() != text:
                 continue
 
             return child

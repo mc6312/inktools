@@ -40,6 +40,8 @@ from inkrandom import RandomInkChooser
 
 
 class MainWnd():
+    DARK_THEME = True # потом м.б. сделать юзерскую настройку
+
     PAGE_STAT, PAGE_CHOICE, PAGE_AVG_COLOR = range(3)
 
     INCLUDE_ANY = 'любые'
@@ -49,14 +51,17 @@ class MainWnd():
     LENS_SRC_CY = LENS_SRC_CX
     LENS_OX = int(LENS_SRC_CX / 2)
     LENS_OY = int(LENS_SRC_CY / 2)
-    LENS_SCALE = 8
+    LENS_SCALE = 9
     LENS_CX = LENS_SRC_CX * LENS_SCALE
     LENS_CY = LENS_SRC_CY * LENS_SCALE
-    LENS_FILL = 0xc0c0c0ff
+
+    SAMPLE_FILL_LIGHT = 0xc0c0c0ff
+    SAMPLE_FILL_DARK = 0x202020ff
 
     MAX_COLOR_SAMPLES = 32
 
-    DET_COL_LABEL, DET_COL_AVAIL, DET_COL_UNAVAIL, DET_COL_UNWANTED, DET_COL_COLOR = range(5)
+    DET_COL_LABEL, DET_COL_AVAIL, DET_COL_UNAVAIL, DET_COL_UNWANTED,\
+    DET_COL_COLOR, DET_COL_HINT = range(6)
 
     SAMPLE_COL_VALUE, SAMPLE_COL_HINT, SAMPLE_COL_PIX = range(3)
 
@@ -72,6 +77,11 @@ class MainWnd():
 
         resldr = get_resource_loader()
         uibldr = get_gtk_builder(resldr, 'inkavail.ui')
+
+        Gtk.Settings.get_default().set_property('gtk-application-prefer-dark-theme',
+            self.DARK_THEME)
+
+        self.sampleFillColor = self.SAMPLE_FILL_DARK if self.DARK_THEME else self.SAMPLE_FILL_LIGHT
 
         self.dbfname = fname
         self.db = None
@@ -96,10 +106,15 @@ class MainWnd():
         #
         self.pages = uibldr.get_object('pages')
 
+        _, self.samplePixbufSize, _ = Gtk.IconSize.lookup(Gtk.IconSize.MENU)
+
         #
         # страница статистики
         #
-        self.nocoloricon = resldr.load_pixbuf_icon_size('nocolor.svg', Gtk.IconSize.MENU, 'computer')
+        self.nocoloricon = resldr.load_pixbuf_icon_size(
+            'nocolor-dark.svg' if self.DARK_THEME else 'nocolor.svg',
+            Gtk.IconSize.MENU,
+            'dialog-question-symbolic')
 
         self.totalstatlstore, self.totalstatview = get_ui_widgets(uibldr,
             'totalstatlstore', 'totalstatview')
@@ -120,12 +135,16 @@ class MainWnd():
         #
         # страница случайного выбора чернил
         #
-        self.randominkname, self.randominktags, self.randominkdesc, self.randominkavail = get_ui_widgets(uibldr,
-            'randominkname randominktags randominkdesc randominkavail')
+        self.randominkname, self.randominktags, self.randominkdesc,\
+        self.randominkavail, self.randominkcolorimg, self.randominkcolordesc = get_ui_widgets(uibldr,
+            'randominkname', 'randominktags', 'randominkdesc',
+            'randominkavail', 'randominkcolorimg', 'randominkcolordesc')
         self.randominkdescbuf = self.randominkdesc.get_buffer()
 
         self.includetagstxt, self.excludetagstxt, self.tagchooserdlg = get_ui_widgets(uibldr,
             'includetagstxt', 'excludetagstxt', 'tagchooserdlg')
+
+        self.randominkColorPixbuf = Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, self.samplePixbufSize, self.samplePixbufSize)
 
         self.tagchecklistbox = CheckListBox(selectionbuttons=True)
         # костыль
@@ -158,35 +177,36 @@ class MainWnd():
         self.imgViewOX = 0
         self.imgViewOY = 0
 
+        self.cursorImgView = None # будет присвоено потом, когда ebImgView заимеет Gdk.Window
+
         self.ebImgView.add_events(Gdk.EventMask.BUTTON_PRESS_MASK\
             | Gdk.EventMask.POINTER_MOTION_MASK\
             | Gdk.EventMask.LEAVE_NOTIFY_MASK)
 
         self.lensPixbuf = Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, self.LENS_CX, self.LENS_CY)
-        self.lensPixbuf.fill(self.LENS_FILL)
+        self.lensPixbuf.fill(self.sampleFillColor)
         self.imgLens.set_from_pixbuf(self.lensPixbuf)
 
         #
-        _, self.samplePixbufSize, _ = Gtk.IconSize.lookup(Gtk.IconSize.MENU)
-
         swSamples, self.ivSamples, self.lstoreSamples, self.labNSamples,\
         self.btnSampleRemove = get_ui_widgets(uibldr,
             'swSamples', 'ivSamples', 'lstoreSamples', 'labNSamples',
             'btnSampleRemove')
         self.itrSelectedSample = None
 
-        swSamples.set_min_content_height(WIDGET_BASE_HEIGHT * 6)
+        self.swImgView.set_min_content_width(WIDGET_BASE_WIDTH * 48)
 
+        swSamples.set_min_content_height(WIDGET_BASE_HEIGHT * 6)
         swSamples.set_size_request(WIDGET_BASE_WIDTH * 24, -1)
 
         #
         self.cursorColorPixbuf = Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, self.samplePixbufSize, self.samplePixbufSize)
-        self.cursorColorPixbuf.fill(self.LENS_FILL)
+        self.cursorColorPixbuf.fill(self.sampleFillColor)
         self.imgCursorColor.set_from_pixbuf(self.cursorColorPixbuf)
 
         #
         self.averageColorPixbuf = Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, self.samplePixbufSize, self.samplePixbufSize)
-        self.averageColorPixbuf.fill(self.LENS_FILL)
+        self.averageColorPixbuf.fill(self.sampleFillColor)
 
         self.imgAverageColor, self.labAverageRGBX, self.btnCopy = get_ui_widgets(uibldr,
             'imgAverageColor','labAverageRGBX','btnCopy')
@@ -231,28 +251,45 @@ class MainWnd():
 
                 # детали
                 for tagstat in self.stats.tagStats:
-                    itr = self.detailstatststore.append(None, (tagstat.title, '', '', '', None))
+                    itr = self.detailstatststore.append(None,
+                            (tagstat.title, '', '', '', None, None))
 
                     expand.append(self.detailstatststore.get_path(itr))
 
                     for tag, nfo in sorted(tagstat.stats.items(), key=lambda r: r[1].available, reverse=True):
                         row = (self.stats.get_tag_display_name(tag),
-                            *nfo.counter_strs(), None)
+                            *nfo.counter_strs(), None,
+                            None)
 
                         subitr = self.detailstatststore.append(itr, row)
 
                         for ink in sorted(nfo.inks, key=lambda i: i.text):
                             if ink.color:
                                 pbuf = Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, self.samplePixbufSize, self.samplePixbufSize)
-                                pbuf.fill(int(self.ColorValue.get_rgb32_value(ink.color)))
+                                pbuf.fill(int(ColorValue.get_rgb32_value(ink.color)))
                             else:
                                 pbuf = self.nocoloricon
+
+                            # 'название', 'отсортированный список человекочитаемых меток', 'описание', 'наличие'
+                            _inkname, _inktags, _inkdesc, _inkavail = self.stats.get_ink_description(ink)
+
+                            hint = ['<b>%s</b>' % _inkname]
+
+                            if ink.color:
+                                hint.append('Цвет: %s' % ColorValue.new_from_rgb24(ink.color).get_description())
+
+                            if _inkdesc:
+                                hint.append(_inkdesc)
+
+                            if _inkavail:
+                                hint.append('В наличии: %s' % _inkavail)
 
                             self.detailstatststore.append(subitr, (ink.text,
                                     __bool_s(ink.avail),
                                     __bool_s(not ink.avail),
                                     __bool_s(ink.done is None),
-                                    pbuf))
+                                    pbuf,
+                                    '\n\n'.join(hint)))
 
                 #TODO когда-нибудь потом прикрутить тэги для выбора
                 self.rndchooser = RandomInkChooser(self.stats, None, None)
@@ -304,20 +341,20 @@ class MainWnd():
         self.choose_random_ink()
 
     def choose_random_ink(self):
-        if self.rndchooser is None:
-            inknamet = '...'
-            inkdesct = ''
-            inkavailt = ''
-        else:
+        inknamet = '...'
+        inktagst = '-'
+        inkdesct = ''
+        inkavailt = '-'
+        inkcolordesc = '' # тут когда-нибудь будет человекочитаемое описание цвета
+        inkcolor = None
+
+        if self.rndchooser is not None:
             self.rndchooser.filter_inks(self.excludetags, self.includetags)
 
             ink = self.rndchooser.choice()
 
             if not ink:
                 inknamet = 'ничего подходящего не нашлось'
-                inktagst = '-'
-                inkdesct = ''
-                inkavailt = '-'
             else:
                 inkName, inkTags, inkDescription, inkAvailability = self.stats.get_ink_description(ink)
 
@@ -326,10 +363,21 @@ class MainWnd():
                 inkdesct = inkDescription
                 inkavailt = markup_escape_text(inkAvailability)
 
+                if ink.color:
+                    inkcolor = ColorValue.get_rgb32_value(ink.color)
+                    inkcolordesc = ColorValue.new_from_rgb24(ink.color).get_description()
+
         self.randominkname.set_markup(inknamet)
         self.randominktags.set_markup(inktagst)
         self.randominkdescbuf.set_text(inkdesct)
         self.randominkavail.set_markup(inkavailt)
+        self.randominkcolordesc.set_text(inkcolordesc)
+
+        if inkcolor is None:
+            self.randominkcolorimg.set_from_pixbuf(self.nocoloricon)
+        else:
+            self.randominkColorPixbuf.fill(inkcolor)
+            self.randominkcolorimg.set_from_pixbuf(self.randominkColorPixbuf)
 
     def randomchbtn_clicked(self, btn):
         self.choose_random_ink()
@@ -464,54 +512,6 @@ class MainWnd():
         self.pages.set_current_page(self.PAGE_AVG_COLOR)
         self.btnImageFile.grab_focus()
 
-    class ColorValue():
-        # строим велосипед, т.к. Gdk.RGBA с какого-то чорта уродуется внутри Gtk.ListStore
-
-        #__slots__ = 'r', 'g', 'b'
-
-        def __init__(self, r, g, b):
-            self.r = r
-            self.g = g
-            self.b = b
-
-        def __eq__(self, other):
-            return (self.r == other.r) and (self.g == other.g) and (self.b == other.b)
-
-        @staticmethod
-        def get_int_value(r, g, b):
-            """Возвращает 32-битное значение вида 0xRRGGBBAA,
-            которое можно скормить Pixbuf.fill()."""
-
-            return (r << 24) | (g << 16) | (b << 8) | 0xff
-
-        @staticmethod
-        def get_rgb32_value(v):
-            """Возвращает 32-битное значение вида 0xRRGGBBAA,
-            которое можно скормить Pixbuf.fill().
-            Используются 24 бита значения v."""
-
-            return ((v & 0xffffff) << 8) | 0xff
-
-        def __int__(self):
-            return self.get_int_value(self.r, self.g, self.b)
-
-        def __repr__(self):
-            return '%s(r=%d, g=%d, b=%d)' % (self.__class__.__name__,
-                self.r, self.g, self.b)
-
-        def get_values(self):
-            return (self.r, self.g, self.b)
-
-        @staticmethod
-        def get_hex_value(r, g, b):
-            return '#%.2x%.2x%.2x' % (r, g, b)
-
-        def to_hex(self):
-            return self.get_hex_value(self.r, self.g, self.b)
-
-        def to_hls(self):
-            return rgb_to_hls(self.r, self.g, self.b)
-
     def color_sample_find_itr(self, v):
         itr = self.lstoreSamples.get_iter_first()
 
@@ -524,7 +524,7 @@ class MainWnd():
     def color_sample_add(self, x, y):
         r, g, b = self.get_pixbuf_pixel(x, y)
 
-        colorv = self.ColorValue(r, g, b)
+        colorv = ColorValue(r, g, b)
 
         itr = self.color_sample_find_itr(colorv)
 
@@ -542,34 +542,29 @@ class MainWnd():
             self.compute_average_color()
 
     def compute_average_color(self):
-        ra = 0.0
-        ga = 0.0
-        ba = 0.0
-        nc = 0
+        colorv = ColorValue(0, 0, 0)
 
         itr = self.lstoreSamples.get_iter_first()
 
         while itr is not None:
-            colorv = self.lstoreSamples.get_value(itr, self.SAMPLE_COL_VALUE)
+            colorv.avg_color_add(self.lstoreSamples.get_value(itr, self.SAMPLE_COL_VALUE))
 
-            ra += colorv.r * colorv.r
-            ga += colorv.g * colorv.g
-            ba += colorv.b * colorv.b
-
-            nc += 1
             itr = self.lstoreSamples.iter_next(itr)
 
-        colorv = self.ColorValue(int(sqrt(ra / nc)), int(sqrt(ga / nc)), int(sqrt(ba / nc)))
+        colorv = colorv.avg_color_get()
 
         self.averageColorPixbuf.fill(int(colorv))
         self.imgAverageColor.set_from_pixbuf(self.averageColorPixbuf)
 
         self.labAverageRGBX.set_text('%s' % colorv.to_hex())
 
-    def btnSampleRemove_clicked(self, btn):
+    def color_sample_remove(self):
         if self.itrSelectedSample:
             self.lstoreSamples.remove(self.itrSelectedSample)
             self.compute_average_color()
+
+    def btnSampleRemove_clicked(self, btn):
+        self.color_sample_remove()
 
     def ivSamples_selection_changed(self, iv):
         sel = iv.get_selected_items()
@@ -579,6 +574,9 @@ class MainWnd():
             self.itrSelectedSample = None
 
         self.btnSampleRemove.set_sensitive(self.itrSelectedSample is not None)
+
+    def ivSamples_item_activated(self, iv, path):
+        self.color_sample_remove()
 
     def imgView_size_allocate(self, wgt, r):
         """Коррекция координат Gtk.Image, т.к. размер его окна
@@ -608,20 +606,20 @@ class MainWnd():
                 self.pixbufPixels[pix + 2])
 
     def motion_event(self, x, y):
-        self.lensPixbuf.fill(self.LENS_FILL)
+        self.lensPixbuf.fill(self.sampleFillColor)
 
         x = int(x) - self.imgViewOX
         y = int(y) - self.imgViewOY
 
         if (self.pixbuf is None) or (x < 0) or (x >= self.pixbufCX) or (y < 0) or (y >= self.pixbufCY):
             rgbx = '-'
-            cursorColor = self.LENS_FILL
+            cursorColor = self.sampleFillColor
         else:
             pixel = self.get_pixbuf_pixel(x, y)
 
-            cursorColor = self.ColorValue.get_int_value(*pixel)
+            cursorColor = ColorValue.get_int_value(*pixel)
 
-            rgbx = self.ColorValue.get_hex_value(*pixel)
+            rgbx = ColorValue.get_hex_value(*pixel)
 
             sx = x - self.LENS_OX
             sy = y - self.LENS_OY
@@ -663,8 +661,25 @@ class MainWnd():
 
         self.labCursorRGBX.set_text(rgbx)
 
+    def imgview_set_cursor(self, cursor):
+        wnd = self.ebImgView.get_window()
+        if wnd:
+            disp = wnd.get_display()
+
+            if not self.cursorImgView:
+                self.cursorImgView = Gdk.Cursor.new_for_display(disp, Gdk.CursorType.CROSSHAIR)
+
+            wnd.set_cursor(cursor)
+
+    def ebImgView_enter_notify_event(self, wgt, event):
+        self.imgview_set_cursor(self.cursorImgView)
+        self.motion_event(event.x, event.y)
+
+        return True
+
     def ebImgView_leave_notify_event(self, wgt, event):
         self.motion_event(-1, -1)
+        self.imgview_set_cursor(None)
 
         return True
 

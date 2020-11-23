@@ -14,6 +14,8 @@
       <column type="gchararray"/>
       <!-- column-name coloricon -->
       <column type="GdkPixbuf"/>
+      <!-- column-name hint -->
+      <column type="gchararray"/>
     </columns>
   </object>
   <object class="GtkImage" id="excludetagsbtnimg">
@@ -209,7 +211,7 @@
                       <object class="GtkMenuItem" id="mnuAverageColor">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">Определить средний цвет</property>
+                        <property name="label" translatable="yes">Определить цвет</property>
                         <property name="use_underline">True</property>
                         <signal name="activate" handler="mnuAverageColor_activate" swapped="no"/>
                         <accelerator key="f" signal="activate" modifiers="GDK_CONTROL_MASK"/>
@@ -350,6 +352,7 @@
                         <property name="model">detailstatststore</property>
                         <property name="headers_clickable">False</property>
                         <property name="enable_grid_lines">both</property>
+                        <property name="tooltip_column">5</property>
                         <child internal-child="selection">
                           <object class="GtkTreeSelection"/>
                         </child>
@@ -492,31 +495,6 @@
                       </packing>
                     </child>
                     <child>
-                      <object class="GtkLabel">
-                        <property name="visible">True</property>
-                        <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">Наличие:</property>
-                        <property name="xalign">0</property>
-                      </object>
-                      <packing>
-                        <property name="left_attach">0</property>
-                        <property name="top_attach">3</property>
-                      </packing>
-                    </child>
-                    <child>
-                      <object class="GtkLabel">
-                        <property name="visible">True</property>
-                        <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">Описание:</property>
-                        <property name="xalign">0</property>
-                        <property name="yalign">0</property>
-                      </object>
-                      <packing>
-                        <property name="left_attach">0</property>
-                        <property name="top_attach">2</property>
-                      </packing>
-                    </child>
-                    <child>
                       <object class="GtkLabel" id="randominktags">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
@@ -531,6 +509,18 @@
                       </packing>
                     </child>
                     <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="can_focus">False</property>
+                        <property name="label" translatable="yes">Наличие:</property>
+                        <property name="xalign">0</property>
+                      </object>
+                      <packing>
+                        <property name="left_attach">0</property>
+                        <property name="top_attach">4</property>
+                      </packing>
+                    </child>
+                    <child>
                       <object class="GtkLabel" id="randominkavail">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
@@ -540,6 +530,19 @@
                       </object>
                       <packing>
                         <property name="left_attach">1</property>
+                        <property name="top_attach">4</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="can_focus">False</property>
+                        <property name="label" translatable="yes">Описание:</property>
+                        <property name="xalign">0</property>
+                        <property name="yalign">0</property>
+                      </object>
+                      <packing>
+                        <property name="left_attach">0</property>
                         <property name="top_attach">3</property>
                       </packing>
                     </child>
@@ -558,6 +561,56 @@
                             <property name="editable">False</property>
                             <property name="wrap_mode">word</property>
                           </object>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="left_attach">1</property>
+                        <property name="top_attach">3</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="can_focus">False</property>
+                        <property name="label" translatable="yes">Цвет:</property>
+                        <property name="xalign">0</property>
+                      </object>
+                      <packing>
+                        <property name="left_attach">0</property>
+                        <property name="top_attach">2</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="can_focus">False</property>
+                        <property name="spacing">4</property>
+                        <child>
+                          <object class="GtkImage" id="randominkcolorimg">
+                            <property name="visible">True</property>
+                            <property name="can_focus">False</property>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">0</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkLabel" id="randominkcolordesc">
+                            <property name="visible">True</property>
+                            <property name="can_focus">False</property>
+                            <property name="hexpand">True</property>
+                            <property name="ellipsize">end</property>
+                            <property name="single_line_mode">True</property>
+                            <property name="max_width_chars">60</property>
+                            <property name="xalign">0</property>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">1</property>
+                          </packing>
                         </child>
                       </object>
                       <packing>
@@ -778,6 +831,7 @@
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
                                 <signal name="button-press-event" handler="ebImgView_button_press_event" swapped="no"/>
+                                <signal name="enter-notify-event" handler="ebImgView_enter_notify_event" swapped="no"/>
                                 <signal name="leave-notify-event" handler="ebImgView_leave_notify_event" swapped="no"/>
                                 <signal name="motion-notify-event" handler="ebImgView_motion_notify_event" swapped="no"/>
                                 <child>
@@ -856,7 +910,7 @@
                               <object class="GtkLabel">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="label" translatable="yes">Цвет:</property>
+                                <property name="label" translatable="yes">Курсор:</property>
                                 <property name="xalign">0</property>
                               </object>
                               <packing>
@@ -985,6 +1039,7 @@
                                 <property name="column_spacing">4</property>
                                 <property name="tooltip_column">1</property>
                                 <property name="item_padding">4</property>
+                                <signal name="item-activated" handler="ivSamples_item_activated" swapped="no"/>
                                 <signal name="selection-changed" handler="ivSamples_selection_changed" swapped="no"/>
                                 <child>
                                   <object class="GtkCellRendererPixbuf" id="crPixbuf"/>
@@ -1139,7 +1194,7 @@
               <object class="GtkLabel" id="labAvgColorTitle">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
-                <property name="label" translatable="yes">Средний цвет</property>
+                <property name="label" translatable="yes">Определитель цвета</property>
               </object>
               <packing>
                 <property name="position">2</property>
