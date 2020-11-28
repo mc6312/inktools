@@ -28,7 +28,7 @@ from math import sqrt
 from colorsys import rgb_to_hls
 
 
-VERSION = '1.3.0'
+VERSION = '1.4.0'
 TITLE = 'InkAvail'
 TITLE_VERSION = '%s v%s' % (TITLE, VERSION)
 
@@ -92,6 +92,18 @@ class ColorValue():
         self.g = g
         self.b = b
 
+        # Т.к. colorsys.rgb_to_hls() пытается определить диапазон значений
+        # (м.б. как 0.0-1.0, так и 0-255) - у этой функции случаются
+        # ошибки при значениях <=1, а потому принудительно приводим
+        # входные значения к диапазону 0.0-1.0, а выходные - к
+        # h: 0-359, l: 0-100, s: 0-100.
+        self.h, self.l, self.s = rgb_to_hls(self.r / 255, self.g / 255, self.b / 255)
+        self.h = int(round(self.h * 359))
+        self.l = int(round(self.l * 100))
+        self.s = int(round(self.s * 100))
+
+        self.hexv = self.get_hex_value(self.r, self.g, self.b)
+
         self.navg = 0
         self.ravg = 0.0
         self.gavg = 0.0
@@ -125,8 +137,8 @@ class ColorValue():
         return self.get_int_value(self.r, self.g, self.b)
 
     def __repr__(self):
-        return '%s(r=%d, g=%d, b=%d)' % (self.__class__.__name__,
-            self.r, self.g, self.b)
+        return '%s(r=%d, g=%d, b=%d, h=%d, l=%d, s=%d, hex=%s)' % (self.__class__.__name__,
+            self.r, self.g, self.b, self.h, self.l, self.s, self.hexv)
 
     def get_values(self):
         return (self.r, self.g, self.b)
@@ -134,21 +146,6 @@ class ColorValue():
     @staticmethod
     def get_hex_value(r, g, b):
         return '#%.2x%.2x%.2x' % (r, g, b)
-
-    def to_hex(self):
-        return self.get_hex_value(self.r, self.g, self.b)
-
-    def to_hls(self):
-        """Преобразование из RGB в HLS.
-
-        Т.к. colorsys.rgb_to_hls() пытается определить диапазон значений
-        (м.б. как 0.0-1.0, так и 0-255) - у этой функции случаются
-        ошибки при значениях <=1, а потому принудительно приводим
-        входные значения к диапазону 0.0-1.0, а выходные - к
-        h: 0-359, l: 0-100, s: 0-100."""
-
-        h, l, s = rgb_to_hls(self.r / 255, self.g / 255, self.b / 255)
-        return (int(round(h * 359)), int(round(l * 100)), int(round(s * 100)))
 
     HUE_NAMES = (
         (12,  'красный'),
@@ -184,8 +181,6 @@ class ColorValue():
         Соответствия Pantone/RAL/... на данный момент нет, и, вероятно,
         не будет."""
 
-        hue, lightness, saturation = self.to_hls()
-
         def __getv(fromlst, v):
             for vrange, vstr in fromlst:
                 if v <= vrange:
@@ -194,20 +189,20 @@ class ColorValue():
             return fromlst[-1][1]
 
         # костыль для тёмных малонасыщенных цветов
-        if saturation <= 3:
-            if lightness <= 4:
+        if self.s <= 3:
+            if self.l <= 4:
                 desc = 'чёрный'
-            elif lightness >= 90:
+            elif self.l >= 90:
                 desc = 'белый'
             else:
-                desc = '%s серый' % __getv(self.LIGHTNESS_NAMES, lightness)
+                desc = '%s серый' % __getv(self.LIGHTNESS_NAMES, self.l)
         else:
             desc = '%s, %s (%d%%), %s (%d%%)' % (
-                __getv(self.HUE_NAMES, hue),
-                __getv(self.SATURATION_NAMES, saturation), saturation,
-                __getv(self.LIGHTNESS_NAMES, lightness), lightness)
+                __getv(self.HUE_NAMES, self.h),
+                __getv(self.SATURATION_NAMES, self.s), self.s,
+                __getv(self.LIGHTNESS_NAMES, self.l), self.l)
 
-        return '%s; %s' % (self.to_hex(), desc)
+        return '%s; %s' % (self.hexv, desc)
 
     def avg_color_add(self, colorv):
         """Накопление значений для вычисления среднего цвета.
@@ -709,7 +704,7 @@ def __test_colordesc():
 
     for r, g, b in colors:
         colorv = ColorValue(r, g, b)
-        print(colorv.to_hex(), colorv.get_description())
+        print(colorv.hexv, colorv.get_description())
 
 
 if __name__ == '__main__':

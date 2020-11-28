@@ -194,6 +194,11 @@ class MainWnd():
             'btnSampleRemove')
         self.itrSelectedSample = None
 
+        for rbtnn, sampler in (('rbtnCursorPixel', self.get_pixbuf_pixel),
+                ('rbtnCursorBoxIntenseColor', self.get_pixbuf_intense_color),
+                ('rbtnCursorBoxDarkest', self.get_pixbuf_darkest_color)):
+            uibldr.get_object(rbtnn).connect('toggled', self.rbtnCursorSamplerMode_toggled, sampler)
+
         self.swImgView.set_min_content_width(WIDGET_BASE_WIDTH * 48)
 
         swSamples.set_min_content_height(WIDGET_BASE_HEIGHT * 6)
@@ -203,6 +208,8 @@ class MainWnd():
         self.cursorColorPixbuf = Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, self.samplePixbufSize, self.samplePixbufSize)
         self.cursorColorPixbuf.fill(self.sampleFillColor)
         self.imgCursorColor.set_from_pixbuf(self.cursorColorPixbuf)
+
+        self.cursorSampler = self.get_pixbuf_pixel
 
         #
         self.averageColorPixbuf = Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, self.samplePixbufSize, self.samplePixbufSize)
@@ -221,6 +228,9 @@ class MainWnd():
         self.load_db()
 
         self.window.show_all()
+
+    def rbtnCursorSamplerMode_toggled(self, rbtn, sampler):
+        self.cursorSampler = sampler
 
     def load_db(self):
         self.totalstatview.set_model(None)
@@ -484,8 +494,15 @@ class MainWnd():
 
         # создаём новый, строго заданного формата, мало ли что там загрузилось, м.б. вообще SVG
         self.pixbuf = Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, self.pixbufCX, self.pixbufCY)
-        tmppbuf.copy_area(0, 0, self.pixbufCX, self.pixbufCY,
-            self.pixbuf, 0, 0)
+
+        self.pixbuf.fill(0x000000ff)
+
+        tmppbuf.composite(self.pixbuf,
+            0, 0, self.pixbufCX, self.pixbufCY,
+            0, 0, 1.0, 1.0,
+            GdkPixbuf.InterpType.TILES, 255);
+        #tmppbuf.copy_area(0, 0, self.pixbufCX, self.pixbufCY,
+        #    self.pixbuf, 0, 0)
 
         self.pixbufPixels = self.pixbuf.get_pixels()
         self.pixbufChannels = self.pixbuf.get_n_channels()
@@ -522,9 +539,10 @@ class MainWnd():
             itr = self.lstoreSamples.iter_next(itr)
 
     def color_sample_add(self, x, y):
-        r, g, b = self.get_pixbuf_pixel(x, y)
+        colorv = self.cursorSampler(x, y)
 
-        colorv = ColorValue(r, g, b)
+        if colorv is None:
+            return
 
         itr = self.color_sample_find_itr(colorv)
 
@@ -533,7 +551,7 @@ class MainWnd():
             pbuf.fill(int(colorv))
 
             itr = self.lstoreSamples.append((colorv,
-                'R=%d, G=%d, B=%d (%s)' % (*colorv.get_values(), colorv.to_hex()),
+                'R=%d, G=%d, B=%d (%s)' % (*colorv.get_values(), colorv.hexv),
                 pbuf))
 
             self.ivSamples.select_path(self.lstoreSamples.get_path(itr))
@@ -565,6 +583,10 @@ class MainWnd():
 
     def btnSampleRemove_clicked(self, btn):
         self.color_sample_remove()
+
+    def btnSampleRemoveAll_clicked(self, btn):
+        self.lstoreSamples.clear()
+        self.compute_average_color()
 
     def ivSamples_selection_changed(self, iv):
         sel = iv.get_selected_items()
@@ -599,11 +621,63 @@ class MainWnd():
             return True
 
     def get_pixbuf_pixel(self, x, y):
+        """Получение значения цвета для точки из self.pixbuf
+        по координатам x, y.
+        Возвращает экземпляр ColorValue, если координаты находятся
+        внутри границ self.pixel, иначе None."""
+
+        if (self.pixbuf is None) or (x < 0) or (x >= self.pixbufCX) or (y < 0) or (y >= self.pixbufCY):
+            return None
+
         pix = x * self.pixbufChannels + y * self.pixbufRowStride
 
-        return (self.pixbufPixels[pix],
+        return ColorValue(self.pixbufPixels[pix],
                 self.pixbufPixels[pix + 1],
                 self.pixbufPixels[pix + 2])
+
+    def __get_pixel_area_colors(self, x, y):
+        """Возвращает список экземпляров ColorValue для точек
+        self.pixbuf из области 7x7."""
+
+        # размер области пока приколочен гвоздями
+        colors = []
+
+        for ox in range(x - 3, x + 4):
+            for oy in range(y - 3, y + 4):
+                c = self.get_pixbuf_pixel(ox, oy)
+
+                if c is not None:
+                    colors.append(c)
+
+        return colors
+
+    def get_pixbuf_intense_color(self, x, y):
+        """Возвращает значение самого насыщенного цвета из
+        области 7х7 в виде экземпляра ColorValue.
+        Если область за пределами границ self.pixbuf, возвращает None."""
+
+        colors = self.__get_pixel_area_colors(x, y)
+
+        maxsatc = None
+        for color in colors:
+            if (maxsatc is None) or (maxsatc.s < color.s):
+                maxsatc = color
+
+        return maxsatc
+
+    def get_pixbuf_darkest_color(self, x, y):
+        """Возвращает значение самого тёмного цвета из
+        области 7х7 в виде экземпляра ColorValue.
+        Если область за пределами границ self.pixbuf, возвращает None."""
+
+        colors = self.__get_pixel_area_colors(x, y)
+
+        darkestc = None
+        for color in colors:
+            if (darkestc is None) or (darkestc.l > color.l):
+                darkestc = color
+
+        return darkestc
 
     def motion_event(self, x, y):
         self.lensPixbuf.fill(self.sampleFillColor)
@@ -611,15 +685,14 @@ class MainWnd():
         x = int(x) - self.imgViewOX
         y = int(y) - self.imgViewOY
 
-        if (self.pixbuf is None) or (x < 0) or (x >= self.pixbufCX) or (y < 0) or (y >= self.pixbufCY):
+        pixelc = self.cursorSampler(x, y)
+
+        if pixelc is None:
             rgbx = '-'
             cursorColor = self.sampleFillColor
         else:
-            pixel = self.get_pixbuf_pixel(x, y)
-
-            cursorColor = ColorValue.get_int_value(*pixel)
-
-            rgbx = ColorValue.get_hex_value(*pixel)
+            rgbx = pixelc.hexv
+            cursorColor = int(pixelc)
 
             sx = x - self.LENS_OX
             sy = y - self.LENS_OY
