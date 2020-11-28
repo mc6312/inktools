@@ -141,7 +141,10 @@
     <property name="can_focus">False</property>
     <property name="border_width">4</property>
     <property name="window_position">mouse</property>
+    <signal name="configure-event" handler="wnd_configure_event" swapped="no"/>
+    <signal name="delete-event" handler="wnd_delete_event" swapped="no"/>
     <signal name="destroy" handler="wnd_destroy" swapped="no"/>
+    <signal name="window-state-event" handler="wnd_state_event" swapped="no"/>
     <child type="titlebar">
       <object class="GtkHeaderBar" id="headerbar">
         <property name="visible">True</property>
@@ -229,7 +232,7 @@
                         <property name="can_focus">False</property>
                         <property name="label" translatable="yes">Выход</property>
                         <property name="use_underline">True</property>
-                        <signal name="activate" handler="wnd_destroy" swapped="no"/>
+                        <signal name="activate" handler="mnuFileQuit_activate" swapped="no"/>
                         <accelerator key="q" signal="activate" modifiers="GDK_CONTROL_MASK"/>
                       </object>
                     </child>

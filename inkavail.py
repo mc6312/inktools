@@ -28,7 +28,7 @@ from math import sqrt
 from colorsys import rgb_to_hls
 
 
-VERSION = '1.4.1'
+VERSION = '1.5.0'
 TITLE = 'InkAvail'
 TITLE_VERSION = '%s v%s' % (TITLE, VERSION)
 
@@ -660,23 +660,17 @@ def get_ink_stats(db):
     return InkNodeStatistics(db) if db is not None else None
 
 
-def process_cmdline():
-    #TODO м.б. присобачить нормальную обработку командной строки
-
-    if len(sys.argv) < 2:
-        fname = 'inks.org'
-    else:
-        fname = os.path.expanduser(sys.argv[1])
-
-    return fname
-
-
 def __test_stats():
     #TODO присобачить файл настроек с указанием файла БД
 
     print('%s\n' % TITLE_VERSION)
 
-    stats = get_ink_stats(load_ink_db(process_cmdline()))
+    from inktoolscfg import Config
+
+    cfg = Config()
+    cfg.load()
+
+    stats = get_ink_stats(load_ink_db(cfg.databaseFileName))
     if stats:
         print(stats.get_total_result_table())
 
@@ -709,5 +703,5 @@ def __test_colordesc():
 
 if __name__ == '__main__':
     print('[testing %s]' % __file__)
-    #__test_stats()
-    __test_colordesc()
+    __test_stats()
+    #__test_colordesc()

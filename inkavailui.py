@@ -35,6 +35,7 @@ from subprocess import Popen
 from colorsys import rgb_to_hls
 from math import sqrt
 
+from inktoolscfg import *
 from inkavail import *
 from inkrandom import RandomInkChooser
 
@@ -70,10 +71,38 @@ class MainWnd():
     def wnd_destroy(self, widget):
         Gtk.main_quit()
 
-    def __init__(self, fname):
+    def before_exit(self):
+        self.cfg.save()
+
+    def wnd_delete_event(self, wnd, event):
+        self.before_exit()
+
+    def wnd_configure_event(self, wnd, event):
+        """Сменились размер/положение окна"""
+
+        self.cfg.mainWindow.wnd_configure_event(wnd, event)
+
+    def wnd_state_event(self, widget, event):
+        """Сменилось состояние окна"""
+
+        self.cfg.mainWindow.wnd_state_event(widget, event)
+
+    def load_window_state(self):
+        """Загрузка и установка размера и положения окна"""
+
+        self.cfg.mainWindow.set_window_state(self.window)
+
+    def mnuFileQuit_activate(self, mi):
+        self.before_exit()
+        self.wnd_destroy(mi)
+
+    def __init__(self):
         #
         self.emacs = which('emacs')
         self.emacsProcess = None
+
+        self.cfg = Config()
+        self.cfg.load()
 
         resldr = get_resource_loader()
         uibldr = get_gtk_builder(resldr, 'inkavail.ui')
@@ -83,7 +112,6 @@ class MainWnd():
 
         self.sampleFillColor = self.SAMPLE_FILL_DARK if self.DARK_THEME else self.SAMPLE_FILL_LIGHT
 
-        self.dbfname = fname
         self.db = None
         self.rndchooser = None
         self.stats = None
@@ -160,7 +188,7 @@ class MainWnd():
         # страница подбора среднего цвета
         #
         self.btnImageFile = uibldr.get_object('btnImageFile')
-        self.btnImageFile.set_current_folder(os.path.abspath('.'))
+        self.btnImageFile.set_current_folder(self.cfg.imageSampleDirectory)
 
         self.swImgView, self.imgView, self.ebImgView,\
         self.labCursorRGBX, self.imgLens, self.imgCursorColor = get_ui_widgets(uibldr,
@@ -194,10 +222,15 @@ class MainWnd():
             'btnSampleRemove')
         self.itrSelectedSample = None
 
-        for rbtnn, sampler in (('rbtnCursorPixel', self.get_pixbuf_pixel),
+        for ix, (rbtnn, sampler) in enumerate((('rbtnCursorPixel', self.get_pixbuf_pixel),
                 ('rbtnCursorBoxIntenseColor', self.get_pixbuf_intense_color),
-                ('rbtnCursorBoxDarkest', self.get_pixbuf_darkest_color)):
-            uibldr.get_object(rbtnn).connect('toggled', self.rbtnCursorSamplerMode_toggled, sampler)
+                ('rbtnCursorBoxDarkest', self.get_pixbuf_darkest_color))):
+            #
+            rbtn = uibldr.get_object(rbtnn)
+            if ix == self.cfg.pixelSamplerMode:
+                rbtn.set_active(True)
+
+            rbtn.connect('toggled', self.rbtnCursorSamplerMode_toggled, (sampler, ix))
 
         self.swImgView.set_min_content_width(WIDGET_BASE_WIDTH * 48)
 
@@ -223,14 +256,18 @@ class MainWnd():
         self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
 
         #
+        self.window.show_all()
+        self.load_window_state()
+
         uibldr.connect_signals(self)
 
         self.load_db()
 
-        self.window.show_all()
+    def rbtnCursorSamplerMode_toggled(self, rbtn, params):
+        sampler, ixmode = params
 
-    def rbtnCursorSamplerMode_toggled(self, rbtn, sampler):
         self.cursorSampler = sampler
+        self.cfg.pixelSamplerMode = ixmode
 
     def load_db(self):
         self.totalstatview.set_model(None)
@@ -245,13 +282,13 @@ class MainWnd():
             return '√' if b else ''
 
         try:
-            self.db = load_ink_db(self.dbfname)
+            self.db = load_ink_db(self.cfg.databaseFileName)
             self.stats = get_ink_stats(self.db)
             self.rndchooser = None
 
             # статистика
             if self.stats:
-                dfname = os.path.split(self.dbfname)[-1]
+                dfname = os.path.split(self.cfg.databaseFileName)[-1]
 
                 # общая статистика
                 totals = self.stats.get_total_result_table()
@@ -337,7 +374,7 @@ class MainWnd():
 
             #
 
-            self.openorgfiledlg.select_filename(self.dbfname)
+            self.openorgfiledlg.select_filename(self.cfg.databaseFileName)
             self.headerbar.set_subtitle(dfname)
 
         finally:
@@ -397,6 +434,8 @@ class MainWnd():
         self.pages.set_current_page(self.PAGE_CHOICE)
 
     def select_load_db(self):
+        self.openorgfiledlg.set_filename(self.cfg.databaseFileName)
+
         self.openorgfiledlg.show_all()
         r = self.openorgfiledlg.run()
         self.openorgfiledlg.hide()
@@ -404,8 +443,8 @@ class MainWnd():
         if r == Gtk.ResponseType.OK:
             fname = self.openorgfiledlg.get_filename()
 
-            if fname != self.dbfname:
-                self.dbfname = fname
+            if fname != self.cfg.databaseFileName:
+                self.cfg.databaseFileName = fname
                 self.load_db()
 
             self.pages.set_current_page(self.PAGE_STAT)
@@ -414,7 +453,7 @@ class MainWnd():
         self.select_load_db()
 
     def mnuFileReload_activate(self, mi):
-        if not self.dbfname:
+        if not self.cfg.databaseFileName:
             self.select_load_db()
         else:
             self.load_db()
@@ -439,7 +478,7 @@ class MainWnd():
                        TITLE,
                        what)
 
-        if not self.dbfname:
+        if not self.cfg.databaseFileName:
             __msg('Файл БД не выбран. Сначала выберите его...')
         elif not self.emacs:
             __msg('Для редактирования БД требуется редактор Emacs')
@@ -447,7 +486,7 @@ class MainWnd():
             __msg('Редактор БД уже работает')
         else:
             try:
-                self.emacsProcess = Popen([self.emacs, '--no-desktop', '--no-splash', self.dbfname])
+                self.emacsProcess = Popen([self.emacs, '--no-desktop', '--no-splash', self.cfg.databaseFileName])
             except Exception as ex:
                 print('* %s' % str(ex), file=sys.stderr)
                 __msg('Сбой запуска редактора БД')
@@ -501,8 +540,6 @@ class MainWnd():
             0, 0, self.pixbufCX, self.pixbufCY,
             0, 0, 1.0, 1.0,
             GdkPixbuf.InterpType.TILES, 255);
-        #tmppbuf.copy_area(0, 0, self.pixbufCX, self.pixbufCY,
-        #    self.pixbuf, 0, 0)
 
         self.pixbufPixels = self.pixbuf.get_pixels()
         self.pixbufChannels = self.pixbuf.get_n_channels()
@@ -516,12 +553,15 @@ class MainWnd():
         #
         self.lstoreSamples.clear()
         self.update_sample_count()
+        self.compute_average_color()
 
     def update_sample_count(self):
         self.labNSamples.set_text('%d (of %d)' % (self.lstoreSamples.iter_n_children(), self.MAX_COLOR_SAMPLES))
 
     def btnImageFile_file_set(self, fcbtn):
         fname = fcbtn.get_filename()
+
+        self.cfg.imageSampleDirectory = os.path.split(fname)[0]
 
         self.load_image(fname)
 
@@ -576,7 +616,7 @@ class MainWnd():
             pb = self.averageColorPixbuf
             ch = colorv.hexv
         else:
-            pb = self.self.nocoloricon
+            pb = self.nocoloricon
             ch = '-'
 
         self.imgAverageColor.set_from_pixbuf(pb)
@@ -776,7 +816,7 @@ class MainWnd():
 
 
 def main():
-    MainWnd(process_cmdline()).main()
+    MainWnd().main()
 
     return 0
 
