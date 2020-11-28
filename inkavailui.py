@@ -571,10 +571,17 @@ class MainWnd():
 
         colorv = colorv.avg_color_get()
 
-        self.averageColorPixbuf.fill(int(colorv))
-        self.imgAverageColor.set_from_pixbuf(self.averageColorPixbuf)
+        if colorv:
+            self.averageColorPixbuf.fill(int(colorv))
+            pb = self.averageColorPixbuf
+            ch = colorv.hexv
+        else:
+            pb = self.self.nocoloricon
+            ch = '-'
 
-        self.labAverageRGBX.set_text('%s' % colorv.hexv)
+        self.imgAverageColor.set_from_pixbuf(pb)
+
+        self.labAverageRGBX.set_text('%s' % ch)
 
     def color_sample_remove(self):
         if self.itrSelectedSample:
