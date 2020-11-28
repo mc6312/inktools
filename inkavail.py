@@ -28,7 +28,7 @@ from math import sqrt
 from colorsys import rgb_to_hls
 
 
-VERSION = '1.5.0'
+VERSION = '1.5.1'
 TITLE = 'InkAvail'
 TITLE_VERSION = '%s v%s' % (TITLE, VERSION)
 
@@ -373,6 +373,11 @@ class InkNodeStatistics():
             self.unwantedInks,
             self.tagStats)
 
+    # флаги для проверки полноты описания
+    HAS_NO_TAGS, HAS_NO_DESCRIPTION, HAS_NO_COLOR, HAS_NO_AVAIL = range(4)
+
+    __INK_TAG = 'ink'
+
     def get_ink_node_statistics(self, node):
         """Сбор статистики для node, если это OrgHeadlineNode с описание
         чернил.
@@ -383,10 +388,33 @@ class InkNodeStatistics():
             return False
 
         # учитываем только ветви, имеющие метку "ink"
-        if 'ink' not in node.tags:
+        if self.__INK_TAG not in node.tags:
             return False
 
+        #
+        # поле для проверки статистики, в файле НЕ сохраняется
+        #
+        node.missing = set()
+
+        if len(node.tags) == 1:
+            # получается, что метка только одна - "ink"
+            node.missing.add(self.HAS_NO_TAGS)
+
         # это "чернильный" элемент дерева - его содержимым кормим статистику
+
+        #
+        # проверяем наличие текстового описания
+        #
+        ntexts = 0
+        for child in node.children:
+            # isinstance тут не годится, нужна строгая проверка типа
+            # т.к. гипотетический наследник OrgTextNode может быть
+            # чем-то заковыристым и не в тему
+            if type(child) is OrgTextNode:
+                ntexts += 1
+
+        if ntexts == 0:
+            node.missing.add(self.HAS_NO_DESCRIPTION)
 
         #
         # обрабатываем специальные подветви
@@ -395,27 +423,34 @@ class InkNodeStatistics():
         def __get_special_text_node(headname):
             """Ищет ветвь типа OrgHeadlineNode с текстом заголовка headname,
             нерекурсивно ищет в ней вложенные ветви типа OrgTextNode.
-            Возвращает список экземпляров OrgTextNode, если чего-нибудь
-            находит, иначе - пустой список."""
+            Возвращает кортеж из двух элементов:
+            булевское значение (успех или облом поиска) и список.
+            В случае успеха в списке находятся экземпляры OrgTextNode,
+            иначе список будет пуст."""
 
             retl = []
 
             hlnode = node.find_child_by_text(headname, OrgHeadlineNode)
+
             if hlnode:
+                fok = True
+
                 for child in hlnode.children:
                     # isinstance тут не годится
                     if type(child) is OrgTextNode:
                         retl.append(child)
+            else:
+                fok = False
 
-            return retl
-
+            return (fok, retl)
 
         #
         # параметры
         #
         node.color = None
 
-        params = __get_special_text_node('параметры')
+        fok, params = __get_special_text_node('параметры')
+
         for paramnode in params:
             # цвет чернил 0xRRGGBB
             # в документе не хранится, используется только статистикой
@@ -423,6 +458,9 @@ class InkNodeStatistics():
 
             if rm:
                 node.color = int(rm.group(1), 16)
+
+        if node.color is None:
+            node.missing.add(self.HAS_NO_COLOR)
 
         #
         # наличие
@@ -433,26 +471,33 @@ class InkNodeStatistics():
         node.availMl = 0.0
         node.availCartridges = False
 
-        avails = __get_special_text_node('в наличии')
-        for availnode in avails:
-            rm = RX_AVAIL_ML.match(availnode.text)
-            if rm:
-                try:
-                    avail = float(rm.group(1))
+        fok, avails = __get_special_text_node('в наличии')
 
-                    node.avail = True
-                    node.availMl += avail
-                    self.availMl += avail
-                except ValueError:
-                    pass
-            else:
-                rm = RX_AVAIL_CR.match(availnode.text)
+        if not fok:
+            node.missing.add(self.HAS_NO_AVAIL)
+        else:
+            for availnode in avails:
+                rm = RX_AVAIL_ML.match(availnode.text)
                 if rm:
-                    node.avail = True
-                    node.availCartridges = True
+                    try:
+                        avail = float(rm.group(1))
+
+                        node.avail = True
+                        node.availMl += avail
+                        self.availMl += avail
+                    except ValueError:
+                        pass
+                else:
+                    rm = RX_AVAIL_CR.match(availnode.text)
+                    if rm:
+                        node.avail = True
+                        node.availCartridges = True
 
         # Внимание:
         # node.avail НЕ зависит от node.done
+        # здесь наличие ветви "в наличии" не учитываем, т.к. её
+        # отсутствие означает "нету чернил", а флаг HAS_NO_AVAIL
+        # нужен только для необязательной проверки полноты описания
 
         if node.avail:
             self.availInks.append(node)
@@ -573,7 +618,7 @@ class InkNodeStatistics():
         if not isinstance(ink, OrgHeadlineNode):
             raise TypeError('get_ink_description(ink): "ink" must be OrgHeadlineNode')
 
-        if 'ink' not in ink.tags:
+        if self.__INK_TAG not in ink.tags:
             raise ValueError('get_ink_description(ink): "ink" must contain ink description')
 
         desc = []
@@ -597,50 +642,12 @@ class InkNodeStatistics():
         # некоторый костылинг
         disptags = ink.tags.copy()
         # удаляем служебную метку - она нужна при загрузке БД, не для отображения
-        disptags.remove('ink')
+        disptags.remove(self.__INK_TAG)
 
         return (ink.text,
                 ', '.join(sorted(map(lambda tag: self.tagNames[tag] if tag in self.tagNames else tag, disptags))),
                 '\n'.join(desc),
                 ' и '.join(avails))
-
-
-def print_table(headers, printheader, table):
-    """Вывод в stdout отформатированной таблицы.
-
-    headers     - список кортежей, содержащих по две строки:
-                  1. текст заголовка;
-                  2. символ выравнивания для форматирования;
-    printheader - булевское значение, False - не печатать заголовок;
-    table       - список списков, содержащих строки."""
-
-    #TODO м.б. стоит присобачить проверку правильности параметров
-
-    widths = [0] * len(headers)
-
-    def update_widths(row):
-        for col, s in enumerate(row):
-            sl = len(s)
-            if sl > widths[col]:
-                widths[col] = sl
-
-    header = []
-
-    header = list(map(lambda v: v[0], headers))
-    update_widths(header)
-
-    for r in table:
-        update_widths(r)
-
-    tabfmt = '  '.join(list(map(lambda h: '{:%s%ds}' % (h[1][1], widths[h[0]]), enumerate(headers))))
-
-    if printheader:
-        print(tabfmt.format(*header))
-
-    for r in table:
-        print(tabfmt.format(*r))
-
-
 
 
 def load_ink_db(fname):

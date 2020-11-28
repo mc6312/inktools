@@ -61,8 +61,9 @@ class MainWnd():
 
     MAX_COLOR_SAMPLES = 32
 
-    DET_COL_LABEL, DET_COL_AVAIL, DET_COL_UNAVAIL, DET_COL_UNWANTED,\
-    DET_COL_COLOR, DET_COL_HINT = range(6)
+    DET_COL_INK, DET_COL_LABEL,\
+    DET_COL_AVAIL, DET_COL_UNAVAIL, DET_COL_UNWANTED,\
+    DET_COL_COLOR, DET_COL_HINT = range(7)
 
     SAMPLE_COL_VALUE, SAMPLE_COL_HINT, SAMPLE_COL_PIX = range(3)
 
@@ -299,12 +300,12 @@ class MainWnd():
                 # детали
                 for tagstat in self.stats.tagStats:
                     itr = self.detailstatststore.append(None,
-                            (tagstat.title, '', '', '', None, None))
+                            (None, tagstat.title, '', '', '', None, None))
 
                     expand.append(self.detailstatststore.get_path(itr))
 
                     for tag, nfo in sorted(tagstat.stats.items(), key=lambda r: r[1].available, reverse=True):
-                        row = (self.stats.get_tag_display_name(tag),
+                        row = (None, self.stats.get_tag_display_name(tag),
                             *nfo.counter_strs(), None,
                             None)
 
@@ -320,18 +321,20 @@ class MainWnd():
                             # 'название', 'отсортированный список человекочитаемых меток', 'описание', 'наличие'
                             _inkname, _inktags, _inkdesc, _inkavail = self.stats.get_ink_description(ink)
 
-                            hint = ['<b>%s</b>' % _inkname]
+                            hint = ['<b>%s</b>' % markup_escape_text(_inkname)]
 
                             if ink.color:
-                                hint.append('Цвет: %s' % ColorValue.new_from_rgb24(ink.color).get_description())
+                                hint.append('Цвет: %s' % markup_escape_text(ColorValue.new_from_rgb24(ink.color).get_description()))
 
                             if _inkdesc:
-                                hint.append(_inkdesc)
+                                hint.append(markup_escape_text(_inkdesc))
 
                             if _inkavail:
-                                hint.append('В наличии: %s' % _inkavail)
+                                hint.append('В наличии: %s' % markup_escape_text(_inkavail))
 
-                            self.detailstatststore.append(subitr, (ink.text,
+                            self.detailstatststore.append(subitr,
+                                    (ink,
+                                    markup_escape_text(ink.text),
                                     __bool_s(ink.avail),
                                     __bool_s(not ink.avail),
                                     __bool_s(ink.done is None),
@@ -387,7 +390,14 @@ class MainWnd():
 
         self.choose_random_ink()
 
-    def choose_random_ink(self):
+    def detailstatsview_row_activated(self, tv, path, col):
+        ink = self.detailstatststore.get_value(self.detailstatststore.get_iter(path),
+            self.DET_COL_INK)
+
+        if ink:
+            self.show_ink(ink, True)
+
+    def show_ink(self, ink, switchpage):
         inknamet = '...'
         inktagst = '-'
         inkdesct = ''
@@ -395,24 +405,19 @@ class MainWnd():
         inkcolordesc = '' # тут когда-нибудь будет человекочитаемое описание цвета
         inkcolor = None
 
-        if self.rndchooser is not None:
-            self.rndchooser.filter_inks(self.excludetags, self.includetags)
+        if not ink:
+            inknamet = 'ничего подходящего не нашлось'
+        else:
+            inkName, inkTags, inkDescription, inkAvailability = self.stats.get_ink_description(ink)
 
-            ink = self.rndchooser.choice()
+            inknamet = '<b>%s</b>' % markup_escape_text(inkName)
+            inktagst = markup_escape_text(inkTags) if inkTags else '-'
+            inkdesct = inkDescription
+            inkavailt = markup_escape_text(inkAvailability)
 
-            if not ink:
-                inknamet = 'ничего подходящего не нашлось'
-            else:
-                inkName, inkTags, inkDescription, inkAvailability = self.stats.get_ink_description(ink)
-
-                inknamet = '<b>%s</b>' % markup_escape_text(inkName)
-                inktagst = markup_escape_text(inkTags) if inkTags else '-'
-                inkdesct = inkDescription
-                inkavailt = markup_escape_text(inkAvailability)
-
-                if ink.color:
-                    inkcolor = ColorValue.get_rgb32_value(ink.color)
-                    inkcolordesc = ColorValue.new_from_rgb24(ink.color).get_description()
+            if ink.color:
+                inkcolor = ColorValue.get_rgb32_value(ink.color)
+                inkcolordesc = ColorValue.new_from_rgb24(ink.color).get_description()
 
         self.randominkname.set_markup(inknamet)
         self.randominktags.set_markup(inktagst)
@@ -425,6 +430,18 @@ class MainWnd():
         else:
             self.randominkColorPixbuf.fill(inkcolor)
             self.randominkcolorimg.set_from_pixbuf(self.randominkColorPixbuf)
+
+        if switchpage:
+            self.pages.set_current_page(self.PAGE_CHOICE)
+
+    def choose_random_ink(self):
+
+        if self.rndchooser is not None:
+            self.rndchooser.filter_inks(self.excludetags, self.includetags)
+
+            ink = self.rndchooser.choice()
+
+            self.show_ink(ink, False)
 
     def randomchbtn_clicked(self, btn):
         self.choose_random_ink()
