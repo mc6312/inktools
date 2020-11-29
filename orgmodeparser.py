@@ -27,17 +27,23 @@ import os.path
 import re
 
 
-VERSION = '0.7'
+VERSION = '0.8'
 
 
 class OrgNode():
     """Базовый класс.
 
+    line        - целое, номер строки в файле;
+                  внимание! содержит правильное значение только после
+                  разбора файла.
+                  в текущей версии orgmodeparser MinimalOrgParser.dumps()
+                  НЕ обновляет номера строк!
     text        - строка (содержимое);
                   подробности зависят от класса-потомка;
     children    - список дочерних ветвей."""
 
     def __init__(self, text):
+        self.line = 0
         self.text = text
         self.children = []
 
@@ -391,14 +397,18 @@ class MinimalOrgParser(OrgNode):
                     prefix = None
                     dname = None
 
+                    node = None
+
                     for nfo in orgiter:
                         if nfo.type == OrgParseIter.TokenInfo.HEADLINE:
-                            destnode.children.append(OrgHeadlineNode(nfo.value))
+                            node = OrgHeadlineNode(nfo.value)
+                            destnode.children.append(node)
                             parse_block(destnode.children[-1], level + 1)
                         elif nfo.type == OrgParseIter.TokenInfo.HLEXIT:
                             break
                         elif nfo.type == OrgParseIter.TokenInfo.COMMENT:
-                            destnode.children.append(OrgCommentNode(nfo.value))
+                            node = OrgCommentNode(nfo.value)
+                            destnode.children.append(node)
                         elif nfo.type == OrgParseIter.TokenInfo.DIRECTIVE:
                             prefix = nfo.type
                             dname = nfo.value
@@ -410,6 +420,9 @@ class MinimalOrgParser(OrgNode):
 
                             destnode.children.append(node)
                             prefix = None
+
+                        if node:
+                            node.line = nfo.line
 
                 parse_block(self, 0)
 

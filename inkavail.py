@@ -312,6 +312,9 @@ class InkNodeStatistics():
         # (ветви, которые и не TODO, и не DONE)
         self.unwantedInks = []
 
+        # список экземпляров OrgHeadlineNode с неполными данными
+        self.hasMissingData = []
+
         # список экземпляров TagStatInfo - статистика по тэгам
         self.tagStats = []
 
@@ -365,16 +368,21 @@ class InkNodeStatistics():
                ]
 
     def __repr__(self):
-        return '%s(availMl=%.2f, availInks=%s, unavailInks=%s, unwantedInks=%s, tagStats=%s)' % (
+        return '%s(availMl=%.2f, availInks=%s, unavailInks=%s, unwantedInks=%s, hasMissingData=%s, tagStats=%s)' % (
             self.__class__.__name__,
             self.availMl,
             self.availInks,
             self.unavailInks,
             self.unwantedInks,
+            self.hasMissingData,
             self.tagStats)
 
     # флаги для проверки полноты описания
-    HAS_NO_TAGS, HAS_NO_DESCRIPTION, HAS_NO_COLOR, HAS_NO_AVAIL = range(4)
+    MISSING_TAGS, MISSING_DESCRIPTION, MISSING_COLOR = range(3)
+
+    STR_MISSING = {MISSING_TAGS:'метки',
+        MISSING_DESCRIPTION:'описание',
+        MISSING_COLOR:'цвет'}
 
     __INK_TAG = 'ink'
 
@@ -398,7 +406,7 @@ class InkNodeStatistics():
 
         if len(node.tags) == 1:
             # получается, что метка только одна - "ink"
-            node.missing.add(self.HAS_NO_TAGS)
+            node.missing.add(self.MISSING_TAGS)
 
         # это "чернильный" элемент дерева - его содержимым кормим статистику
 
@@ -414,7 +422,7 @@ class InkNodeStatistics():
                 ntexts += 1
 
         if ntexts == 0:
-            node.missing.add(self.HAS_NO_DESCRIPTION)
+            node.missing.add(self.MISSING_DESCRIPTION)
 
         #
         # обрабатываем специальные подветви
@@ -460,7 +468,7 @@ class InkNodeStatistics():
                 node.color = int(rm.group(1), 16)
 
         if node.color is None:
-            node.missing.add(self.HAS_NO_COLOR)
+            node.missing.add(self.MISSING_COLOR)
 
         #
         # наличие
@@ -473,31 +481,25 @@ class InkNodeStatistics():
 
         fok, avails = __get_special_text_node('в наличии')
 
-        if not fok:
-            node.missing.add(self.HAS_NO_AVAIL)
-        else:
-            for availnode in avails:
-                rm = RX_AVAIL_ML.match(availnode.text)
-                if rm:
-                    try:
-                        avail = float(rm.group(1))
+        for availnode in avails:
+            rm = RX_AVAIL_ML.match(availnode.text)
+            if rm:
+                try:
+                    avail = float(rm.group(1))
 
-                        node.avail = True
-                        node.availMl += avail
-                        self.availMl += avail
-                    except ValueError:
-                        pass
-                else:
-                    rm = RX_AVAIL_CR.match(availnode.text)
-                    if rm:
-                        node.avail = True
-                        node.availCartridges = True
+                    node.avail = True
+                    node.availMl += avail
+                    self.availMl += avail
+                except ValueError:
+                    pass
+            else:
+                rm = RX_AVAIL_CR.match(availnode.text)
+                if rm:
+                    node.avail = True
+                    node.availCartridges = True
 
         # Внимание:
         # node.avail НЕ зависит от node.done
-        # здесь наличие ветви "в наличии" не учитываем, т.к. её
-        # отсутствие означает "нету чернил", а флаг HAS_NO_AVAIL
-        # нужен только для необязательной проверки полноты описания
 
         if node.avail:
             self.availInks.append(node)
@@ -508,6 +510,12 @@ class InkNodeStatistics():
         # avail/unavail!
         if node.done == None:
             self.unwantedInks.append(node)
+
+        #
+        # записи с неполными данными
+        #
+        if node.missing:
+            self.hasMissingData.append(node)
 
         #
         # скармливаем всё, что следует, статистике "по тэгам"
@@ -684,6 +692,11 @@ def __test_stats():
         for tagstat in stats.tagStats:
             print('\n%s' % tagstat.title)
             print(tagstat.stats)
+
+        print('\n\nС неполными данными:')
+        for ink in stats.hasMissingData:
+            print('%s: %s' % (ink.text,
+                ', '.join(map(lambda k: stats.STR_MISSING[k], ink.missing))))
 
     return 0
 

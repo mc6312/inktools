@@ -156,6 +156,12 @@ class MainWnd():
 
         self.openorgfiledlg = uibldr.get_object('openorgfiledlg')
 
+        #
+        # таблица чернил с неполными данными
+        #
+        self.missingdataview, self.missingdatalstore = get_ui_widgets(uibldr,
+            'missingdataview missingdatalstore')
+
         # грязный хакЪ из-за ошибки в Glade 3.22.2, криво генерирующей элементы меню со значками
         mnuFile = uibldr.get_object('mnuFile')
         img = Gtk.Image.new_from_icon_name('open-menu-symbolic', Gtk.IconSize.MENU)
@@ -184,6 +190,8 @@ class MainWnd():
 
         taglistvbox = self.tagchooserdlg.get_content_area()
         taglistvbox.pack_start(self.tagchecklistbox, True, True, 0)
+
+        self.chosenInk = None
 
         #
         # страница подбора среднего цвета
@@ -277,6 +285,9 @@ class MainWnd():
         self.detailstatsview.set_model(None)
         self.detailstatststore.clear()
 
+        self.missingdataview.set_model(None)
+        self.missingdatalstore.clear()
+
         expand = []
 
         def __bool_s(b):
@@ -291,13 +302,17 @@ class MainWnd():
             if self.stats:
                 dfname = os.path.split(self.cfg.databaseFileName)[-1]
 
+                #
                 # общая статистика
+                #
                 totals = self.stats.get_total_result_table()
 
                 for row in totals:
                     self.totalstatlstore.append(row)
 
+                #
                 # детали
+                #
                 for tagstat in self.stats.tagStats:
                     itr = self.detailstatststore.append(None,
                             (None, tagstat.title, '', '', '', None, None))
@@ -341,6 +356,14 @@ class MainWnd():
                                     pbuf,
                                     '\n\n'.join(hint)))
 
+                #
+                # записи с неполными данными
+                #
+                for ink in self.stats.hasMissingData:
+                    self.missingdatalstore.append((ink,
+                        ink.text,
+                        ', '.join(map(lambda k: self.stats.STR_MISSING[k], ink.missing))))
+
                 #TODO когда-нибудь потом прикрутить тэги для выбора
                 self.rndchooser = RandomInkChooser(self.stats, None, None)
 
@@ -381,6 +404,7 @@ class MainWnd():
             self.headerbar.set_subtitle(dfname)
 
         finally:
+            self.missingdataview.set_model(self.missingdatalstore)
             self.detailstatsview.set_model(self.detailstatststore)
 
             for path in expand:
@@ -389,6 +413,12 @@ class MainWnd():
             self.totalstatview.set_model(self.totalstatlstore)
 
         self.choose_random_ink()
+
+    def missingdataview_row_activated(self, tv, path, col):
+        ink = self.missingdatalstore.get_value(self.missingdatalstore.get_iter(path), 0)
+
+        if ink:
+            self.show_ink(ink, True)
 
     def detailstatsview_row_activated(self, tv, path, col):
         ink = self.detailstatststore.get_value(self.detailstatststore.get_iter(path),
@@ -404,6 +434,8 @@ class MainWnd():
         inkavailt = '-'
         inkcolordesc = '' # тут когда-нибудь будет человекочитаемое описание цвета
         inkcolor = None
+
+        self.chosenInk = ink
 
         if not ink:
             inknamet = 'ничего подходящего не нашлось'
@@ -445,6 +477,13 @@ class MainWnd():
 
     def randomchbtn_clicked(self, btn):
         self.choose_random_ink()
+
+    def openeditbutton_clicked(self, btn):
+        self.start_editor_on_chosen_ink()
+
+    def mnuEditChosenInk_activate(self, mi):
+        self.pages.set_current_page(self.PAGE_CHOICE)
+        self.start_editor_on_chosen_ink()
 
     def mnuRandomChoice_activate(self, wgt):
         self.choose_random_ink()
@@ -489,7 +528,11 @@ class MainWnd():
                 self.emacsProcess = None
                 return False
 
-    def start_editor(self):
+    def start_editor_on_chosen_ink(self):
+        if self.chosenInk:
+            self.start_editor(self.chosenInk.line)
+
+    def start_editor(self, gotoline=-1):
         def __msg(what):
             msg_dialog(self.window,
                        TITLE,
@@ -503,7 +546,14 @@ class MainWnd():
             __msg('Редактор БД уже работает')
         else:
             try:
-                self.emacsProcess = Popen([self.emacs, '--no-desktop', '--no-splash', self.cfg.databaseFileName])
+                cmd = [self.emacs, '--no-desktop', '--no-splash']
+
+                if gotoline >= 0:
+                    cmd.append('+%d' % gotoline)
+
+                cmd.append(self.cfg.databaseFileName)
+
+                self.emacsProcess = Popen(cmd)
             except Exception as ex:
                 print('* %s' % str(ex), file=sys.stderr)
                 __msg('Сбой запуска редактора БД')
