@@ -28,7 +28,7 @@ from math import sqrt
 from colorsys import rgb_to_hls
 
 
-VERSION = '1.5.1'
+VERSION = '1.6.0'
 TITLE = 'InkAvail'
 TITLE_VERSION = '%s v%s' % (TITLE, VERSION)
 

@@ -817,6 +817,7 @@
                       <object class="GtkBox">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
+                        <property name="hexpand">True</property>
                         <property name="spacing">4</property>
                         <child>
                           <object class="GtkButton" id="randomchbtn">
@@ -824,7 +825,6 @@
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="receives_default">True</property>
-                            <property name="margin_left">16</property>
                             <signal name="clicked" handler="randomchbtn_clicked" swapped="no"/>
                             <style>
                               <class name="suggested-action"/>
