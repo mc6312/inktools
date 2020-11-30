@@ -214,6 +214,13 @@ class MainWnd():
         self.imgViewOX = 0
         self.imgViewOY = 0
 
+        #
+        # курсор цветовыбиралки
+        #
+        self.pixbufCursorImgView = resldr.load_pixbuf('cursor.png', None, None)
+        self.cursorImgViewOX = 7
+        self.cursorImgViewOY = 7
+
         self.cursorImgView = None # будет присвоено потом, когда ebImgView заимеет Gdk.Window
 
         self.ebImgView.add_events(Gdk.EventMask.BUTTON_PRESS_MASK\
@@ -231,15 +238,21 @@ class MainWnd():
             'btnSampleRemove')
         self.itrSelectedSample = None
 
-        for ix, (rbtnn, sampler) in enumerate((('rbtnCursorPixel', self.get_pixbuf_pixel),
+        self.cursorSamplers = (('rbtnCursorPixel', self.get_pixbuf_pixel),
                 ('rbtnCursorBoxIntenseColor', self.get_pixbuf_intense_color),
-                ('rbtnCursorBoxDarkest', self.get_pixbuf_darkest_color))):
+                ('rbtnCursorBoxDarkest', self.get_pixbuf_darkest_color))
+
+        self.cursorSampler = self.get_pixbuf_pixel
+
+        for ix, (rbtnn, sampler) in enumerate(self.cursorSamplers):
             #
             rbtn = uibldr.get_object(rbtnn)
             if ix == self.cfg.pixelSamplerMode:
                 rbtn.set_active(True)
 
-            rbtn.connect('toggled', self.rbtnCursorSamplerMode_toggled, (sampler, ix))
+            rbtn.connect('toggled', self.rbtnCursorSamplerMode_toggled, ix)
+
+        self.cursorSampler = self.cursorSamplers[self.cfg.pixelSamplerMode][-1]
 
         self.swImgView.set_min_content_width(WIDGET_BASE_WIDTH * 48)
 
@@ -250,8 +263,6 @@ class MainWnd():
         self.cursorColorPixbuf = Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, self.samplePixbufSize, self.samplePixbufSize)
         self.cursorColorPixbuf.fill(self.sampleFillColor)
         self.imgCursorColor.set_from_pixbuf(self.cursorColorPixbuf)
-
-        self.cursorSampler = self.get_pixbuf_pixel
 
         #
         self.averageColorPixbuf = Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, self.samplePixbufSize, self.samplePixbufSize)
@@ -272,11 +283,10 @@ class MainWnd():
 
         self.load_db()
 
-    def rbtnCursorSamplerMode_toggled(self, rbtn, params):
-        sampler, ixmode = params
-
-        self.cursorSampler = sampler
-        self.cfg.pixelSamplerMode = ixmode
+    def rbtnCursorSamplerMode_toggled(self, rbtn, samplerIx):
+        if rbtn.get_active():
+            self.cursorSampler = self.cursorSamplers[samplerIx][-1]
+            self.cfg.pixelSamplerMode = samplerIx
 
     def load_db(self):
         self.totalstatview.set_model(None)
@@ -854,7 +864,10 @@ class MainWnd():
             disp = wnd.get_display()
 
             if not self.cursorImgView:
-                self.cursorImgView = Gdk.Cursor.new_for_display(disp, Gdk.CursorType.CROSSHAIR)
+                #self.cursorImgView = Gdk.Cursor.new_for_display(disp, Gdk.CursorType.CROSSHAIR)
+                self.cursorImgView = Gdk.Cursor.new_from_pixbuf(disp,
+                    self.pixbufCursorImgView,
+                    self.cursorImgViewOX, self.cursorImgViewOY)
 
             wnd.set_cursor(cursor)
 

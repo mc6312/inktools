@@ -36,7 +36,7 @@ from sys import stderr, argv
 import os.path
 
 
-REVISION = 20201110
+REVISION = 2020113000
 
 
 def get_widget_base_units():
@@ -69,19 +69,38 @@ if WIDGET_SPACING < 4:
 WIDE_WIDGET_SPACING = WIDGET_SPACING * 3
 
 
-def load_system_icon(name, size, pixelsize=False):
+def load_system_icon(name, size, pixelsize=False, fallback=None, symbolic=False):
     """Возвращает Pixbuf для "системной" (из установленной темы)
     иконки с именем name и размером size.
 
-    size    - стандартный размер Gtk.IconSize.* если pixelsize==False,
-              иначе считаем, что size - размер в пикселях."""
+    name        - стока с именем иконки в системной теме;
+    size        - размер иконки (Gtk.IconSize.* или целое);
+    pixelsize   - булевское значение;
+                  если True - size д.б. целым числом, размером в пикселях;
+    fallback    - None или строка с именем иконки на случай отсутствия
+                  в системной теме иконки с именем name;
+    symbolic    - искать "плоскую" иконку.
+
+    Возвращает экземпляр Gtk.Pixbuf
+    (или None, если подходящей иконки нет)."""
 
     if not pixelsize:
         size = Gtk.IconSize.lookup(size)[1]
 
-    return Gtk.IconTheme.get_default().load_icon(name,
-        size,
-        Gtk.IconLookupFlags.FORCE_SIZE)
+    theme = Gtk.IconTheme.get_default()
+
+    flags = Gtk.IconLookupFlags.FORCE_SIZE
+
+    if symbolic:
+        flags |= Gtk.IconLookupFlags.FORCE_SYMBOLIC
+
+    icon = theme.lookup_icon(name, size, flags)
+
+    if icon is None:
+        if fallback:
+            icon = theme.lookup_icon(fallback, size, flags)
+
+    return icon.load_icon() if icon is not None else None
 
 
 #
@@ -107,6 +126,7 @@ def get_ui_widgets(builder, *names):
                 __parse_params(param)
             elif isinstance(param, str):
                 param = param.split(None)
+
                 if len(param) > 1:
                     __parse_params(param)
                 else:
@@ -123,9 +143,36 @@ def get_ui_widgets(builder, *names):
     return widgets
 
 
+class WidgetList(list):
+    """Список экземпляров Gtk.Widget, позволяющий вытворять с собой всякое."""
+
+    @classmethod
+    def new_from_builder(cls, builder, *names):
+        return cls(get_ui_widgets(builder, names))
+
+    def set_sensitive(self, bsensitive):
+        for widget in self:
+            widget.set_sensitive(bsensitive)
+
+    def set_visible(self, bvisible):
+        for widget in self:
+            widget.set_visible(bvisible)
+
+    def set_style(self, css):
+        """Задание стиля для виджетов widgets в формате CSS"""
+
+        dbsp = Gtk.CssProvider()
+        dbsp.load_from_data(css) # убейте гномосексуалистов кто-нибудь!
+
+        for widget in self:
+            dbsc = widget.get_style_context()
+            dbsc.add_provider(dbsp, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+
 def set_widgets_sensitive(widgets, bsensitive):
     """Устанавливает значения свойства "sensitive" равным значению
-    bsensitive для виджетов из списка widgets."""
+    bsensitive для виджетов из списка widgets.
+    Оставлено для совместимости, далее лучше использовать WidgetList."""
 
     for widget in widgets:
         widget.set_sensitive(bsensitive)
@@ -133,7 +180,8 @@ def set_widgets_sensitive(widgets, bsensitive):
 
 def set_widgets_visible(widgets, bvisible):
     """Устанавливает значения свойства "visible" равным значению
-    bvisible для виджетов из списка widgets."""
+    bvisible для виджетов из списка widgets.
+    Оставлено для совместимости, далее лучше использовать WidgetList."""
 
     for widget in widgets:
         widget.set_visible(bvisible)
@@ -178,7 +226,11 @@ def create_aligned_label(title, halign=0.0, valign=0.0):
 
 
 def set_widget_style(css, *widgets):
-    """Задание стиля для виджетов widgets в формате CSS"""
+    """Задание стиля для виджетов widgets в формате CSS.
+    Оставлено для совместимости и для издевательств над
+    отдельными виджетами.
+    Для групп виджетов стоит использовать одноимённый
+    метод класса WidgetList."""
 
     dbsp = Gtk.CssProvider()
     dbsp.load_from_data(css) # убейте гномосексуалистов кто-нибудь!
@@ -254,7 +306,7 @@ def create_file_filter(name, patterns):
                несколько масок, разделённых запятыми)."""
 
     ffl = Gtk.FileFilter()
-    ffl.set_name('Изображения')
+    ffl.set_name(name)
 
     def add_pattern_str(s):
         for pat in map(lambda v: v.strip(), s.split(',')):
@@ -349,12 +401,20 @@ class FileResourceLoader():
 
     @staticmethod
     def pixbuf_from_bytes(b, width, height):
-        """Создаёт и возвращает Gdk.Pixbuf из b - экземпляра GLib.Bytes.
+        """Создаёт и возвращает экземпляр Gdk.Pixbuf.
 
-        width, height - размеры создаваемого изображения в пикселах."""
+        b       - экземпляр GLib.Bytes с данными в формате PNG/JPG/...,
+        width,
+        height  - целые, размеры изображения в пикселах, если нужен
+                  определённый размер;
+                  для загрузки "как есть" следует указывать значения
+                  <=0 или None."""
 
-        return Pixbuf.new_from_stream_at_scale(Gio.MemoryInputStream.new_from_bytes(b),
-            width, height, True)
+        if isinstance(width, int) and width > 0:
+            return Pixbuf.new_from_stream_at_scale(Gio.MemoryInputStream.new_from_bytes(b),
+                    width, height, None)
+        else:
+            return Pixbuf.new_from_stream(Gio.MemoryInputStream.new_from_bytes(b), None)
 
     def load_pixbuf_icon_size(self, filename, size, fallback=None):
         """Делает то же, что load_pixbuf, но size - константа Gtk.IconSize.*"""
@@ -367,7 +427,10 @@ class FileResourceLoader():
         """Загружает файл в память и возвращает экземпляр Gdk.Pixbuf.
 
         filename        - имя файла (см. load_bytes),
-        width, height   - размеры создаваемого изображения в пикселах,
+        width, height   - целые, размеры изображения в пикселах, если нужен
+                          определённый размер;
+                          для загрузки "как есть" следует указывать значения
+                          <=0 или None.
         fallback        - имя стандартной иконки, которая будет загружена,
                           если не удалось загрузить файл filename;
                           если fallback=None - генерируется исключение."""
@@ -381,6 +444,11 @@ class FileResourceLoader():
                 raise ex
             else:
                 print('Loading fallback image "%s"' % fallback, file=stderr)
+
+                if not isinstance(height, int) or height <= 0:
+                    # времянка!
+                    height = Gtk.IconSize.lookup(Gtk.IconSize.MENU)[1]
+
                 return Gtk.IconTheme.get_default().load_icon(fallback, height, Gtk.IconLookupFlags.FORCE_SIZE)
 
     def load_gtk_builder(self, filename):
@@ -394,7 +462,7 @@ class FileResourceLoader():
 
 class ZipFileResourceLoader(FileResourceLoader):
     """Загрузчик файлов ресурсов из архива ZIP.
-    Архив - сам файл flibrowser2 в случае, когда он
+    Архив - сам файл приложения в случае, когда он
     представляет собой python zip application."""
 
     def load(self, filename):
@@ -444,6 +512,14 @@ class TreeViewShell():
 
         return cls(builder.get_object(widgetname))
 
+    def get_iter_last(self, itr=None):
+        """Возвращает Gtk.TreeIter последнего элемента на уровне itr,
+        или None, если такового нет."""
+
+        n = self.store.iter_n_children(None)
+        if n > 0:
+            return self.store.get_iter(Gtk.TreePath.new_from_indices([n - 1]))
+
     def get_selected_iter(self):
         """Возвращает Gtk.TreeIter первого выбранного элемента (если
         что-то выбрано) или None."""
@@ -455,10 +531,16 @@ class TreeViewShell():
             if rows:
                 return self.store.get_iter(rows[0])
 
-    def select_iter(self, itr):
-        """Выбирает элемент в дереве, указанный itr (экземпляром
+    def select_iter(self, itr, col=None, edit=False):
+        """Выбирает указанный элемент в дереве, указанный itr (экземпляром
         Gtk.TreeIter), при необходимости заставляет TreeView развернуть
-        соответствующий уровень дерева."""
+        соответствующий уровень дерева.
+
+        itr     - экземпляр Gtk.TreeIter;
+        col     - None или Gtk.TreeViewColumn;
+        edit    - булевское значение; если True, col is not None
+                  и соотв. ячейка редактируемая - включает режим
+                  редактирования ячейки."""
 
         path = self.store.get_path(itr)
 
@@ -466,7 +548,7 @@ class TreeViewShell():
             self.view.expand_row(path, self.expandSelectedAll)
 
         self.selection.select_path(path)
-        self.view.set_cursor(path, None, False)
+        self.view.set_cursor(path, col, edit)
 
     def enable_sorting(self, enable):
         """Разрешение/запрет сортировки treestore."""
@@ -491,23 +573,23 @@ class TreeViewShell():
         self.view.set_model(self.store)
 
 
-def __test_rl():
-    rl = get_resource_loader()
-
-    b = rl.load('btfm-ui.xml')
-    s = str(b, 'utf-8')
-    print(s)
-
-
-def __test_msgdlg():
+def __debug_msgdlg():
     print(msg_dialog(None, 'Message dialog test', 'Delete anything?', buttons=Gtk.ButtonsType.YES_NO,
         destructive_response=Gtk.ResponseType.YES,
         suggested_response=Gtk.ResponseType.NO))
 
 
-if __name__ == '__main__':
-    print('[test of %s]' % __file__)
+def __debug_load_icon():
+    pbuf = load_system_icon('applications-internet',
+        Gtk.IconSize.MENU,
+        symbolic=True)
 
-    #__test_rl()
-    __test_msgdlg()
+    print(pbuf)
+
+
+if __name__ == '__main__':
+    print('[debugging %s]' % __file__)
+
+    #__debug_msgdlg()
+    __debug_load_icon()
 

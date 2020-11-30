@@ -47,7 +47,7 @@ docview:
 	x-www-browser $(docname)
 	#rm $(docname)
 show-branch:
-	@echo "$(branch)"
+	@echo "$(version)-$(branch)"
 todo:
 	pytodo.py $(srcs) >$(todo)
 edit-db:
