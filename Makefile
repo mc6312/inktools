@@ -1,6 +1,6 @@
 packer = tar
 pack = $(packer) caf
-unpack = $(packer) --keep-newer-files xaf
+unpack = $(packer) --keep-newer-files -xaf
 arcx = .tar.xz
 todo = TODO
 docs = Changelog LICENSE README.md $(todo)
@@ -13,7 +13,7 @@ zipname = $(basename).zip
 arcname = $(basename)$(arcx)
 srcarcname = $(basename)-$(branch)-src$(arcx)
 srcs = *.py
-resources = *.svg *.ui
+resources = *.svg *.ui *.png
 backupdir = ~/shareddocs/pgm/python/
 
 app:
@@ -25,7 +25,7 @@ app:
 
 archive:
 	make todo
-	$(pack) $(srcarcname) *.py *.ui *.svg *.org Makefile *.geany $(docs)
+	$(pack) $(srcarcname) $(srcs) $(resources) *.org Makefile *.geany $(docs)
 distrib:
 	make app
 	$(eval distname = $(basename)-$(version)$(arcx))
