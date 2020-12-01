@@ -28,9 +28,11 @@ from math import sqrt
 from colorsys import rgb_to_hls
 
 
-VERSION = '1.6.1'
-TITLE = 'InkAvail'
+VERSION = '1.6.2'
+TITLE = 'InkTools'
 TITLE_VERSION = '%s v%s' % (TITLE, VERSION)
+COPYRIGHT = '🄯 2020 MC-6312'
+URL = 'https://github.com/mc6312/inktools'
 
 
 MILLILITERS = 1000.0

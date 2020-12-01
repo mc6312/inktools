@@ -43,8 +43,6 @@ from inkrandom import RandomInkChooser
 class MainWnd():
     DARK_THEME = True # потом м.б. сделать юзерскую настройку
 
-    PAGE_STAT, PAGE_CHOICE, PAGE_AVG_COLOR = range(3)
-
     INCLUDE_ANY = 'любые'
     EXCLUDE_NOTHING = 'никаких'
 
@@ -121,11 +119,25 @@ class MainWnd():
         self.includetags = set()
         self.excludetags = set()
 
+        __LOGO = 'inktools.svg'
+        #
+        # очень важное окно
+        #
+        self.aboutDialog = uibldr.get_object('aboutDialog')
+
+        logoSize = WIDGET_BASE_HEIGHT * 10
+        self.aboutDialog.set_logo(resldr.load_pixbuf(__LOGO, logoSize, logoSize))
+        self.aboutDialog.set_program_name(TITLE)
+        self.aboutDialog.set_version(TITLE_VERSION)
+        self.aboutDialog.set_copyright(COPYRIGHT)
+        self.aboutDialog.set_website(URL)
+        self.aboutDialog.set_website_label(URL)
+
         #
         # основное окно
         #
         self.window = uibldr.get_object('inkavailwnd')
-        icon = resldr.load_pixbuf_icon_size('inktools.svg', Gtk.IconSize.DIALOG, 'computer')
+        icon = resldr.load_pixbuf_icon_size(__LOGO, Gtk.IconSize.DIALOG, 'computer')
         self.window.set_icon(icon)
 
         self.headerbar = uibldr.get_object('headerbar')
@@ -133,7 +145,8 @@ class MainWnd():
         self.headerbar.set_title(TITLE_VERSION)
 
         #
-        self.pages = uibldr.get_object('pages')
+        self.pages, self.pageStatistics, self.pageChooser, self.pageSampler = get_ui_widgets(uibldr,
+            'pages', 'pageStatistics', 'pageChooser', 'pageSampler')
 
         _, self.samplePixbufSize, _ = Gtk.IconSize.lookup(Gtk.IconSize.MENU)
 
@@ -279,9 +292,19 @@ class MainWnd():
         self.window.show_all()
         self.load_window_state()
 
+        self.pageStatistics.set_position(self.cfg.statPanedPos)
+
         uibldr.connect_signals(self)
 
         self.load_db()
+
+    def mnuFileAbout_activate(self, mi):
+        self.aboutDialog.show()
+        self.aboutDialog.run()
+        self.aboutDialog.hide()
+
+    def pageStatistics_position_notify(self, paned, pos):
+        self.cfg.statPanedPos = paned.get_position()
 
     def rbtnCursorSamplerMode_toggled(self, rbtn, samplerIx):
         if rbtn.get_active():
@@ -369,7 +392,7 @@ class MainWnd():
                 #
                 # записи с неполными данными
                 #
-                for ink in self.stats.hasMissingData:
+                for ink in sorted(self.stats.hasMissingData, key=lambda i: i.text):
                     self.missingdatalstore.append((ink,
                         ink.text,
                         ', '.join(map(lambda k: self.stats.STR_MISSING[k], ink.missing))))
@@ -474,7 +497,7 @@ class MainWnd():
             self.randominkcolorimg.set_from_pixbuf(self.randominkColorPixbuf)
 
         if switchpage:
-            self.pages.set_current_page(self.PAGE_CHOICE)
+            self.pages.set_visible_child(self.pageChooser)
 
     def choose_random_ink(self):
 
@@ -492,12 +515,12 @@ class MainWnd():
         self.start_editor_on_chosen_ink()
 
     def mnuEditChosenInk_activate(self, mi):
-        self.pages.set_current_page(self.PAGE_CHOICE)
+        self.pages.set_visible_child(self.pageChooser)
         self.start_editor_on_chosen_ink()
 
     def mnuRandomChoice_activate(self, wgt):
         self.choose_random_ink()
-        self.pages.set_current_page(self.PAGE_CHOICE)
+        self.pages.set_visible_child(self.pageChooser)
 
     def select_load_db(self):
         self.openorgfiledlg.set_filename(self.cfg.databaseFileName)
@@ -513,7 +536,7 @@ class MainWnd():
                 self.cfg.databaseFileName = fname
                 self.load_db()
 
-            self.pages.set_current_page(self.PAGE_STAT)
+            self.pages.set_visible_child(self.pageStatistics)
 
     def mnuFileOpen_activate(self, mi):
         self.select_load_db()
@@ -643,7 +666,7 @@ class MainWnd():
         self.load_image(fname)
 
     def mnuAverageColor_activate(self, mi):
-        self.pages.set_current_page(self.PAGE_AVG_COLOR)
+        self.pages.set_visible_child(self.pageSampler)
         self.btnImageFile.grab_focus()
 
     def color_sample_find_itr(self, v):

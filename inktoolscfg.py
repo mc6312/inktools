@@ -156,6 +156,7 @@ class Config():
     SAMPLEDIR = 'image_sample_directory'
     DBFNAME = 'database_file_name'
     SAMPLERMODE = 'pixel_sampler_mode'
+    STATPANEDPOS = 'stat_paned_position'
 
     CFGFN = 'settings.json'
     CFGAPP = 'inktools'
@@ -176,6 +177,8 @@ class Config():
 
         self.pixelSamplerMode = 0
 
+        self.statPanedPos = 0
+
         # определяем каталог для настроек
         # или принудительно создаём, если его ещё нет
 
@@ -190,6 +193,14 @@ class Config():
     def load(self):
         E_SETTINGS = 'Ошибка в файле настроек "%s": %%s' % self.configPath
 
+        def __dict_get(d, pname, ptype, fallback):
+            v = d.get(pname, fallback)
+
+            if not isinstance(v, ptype):
+                raise EnvironmentError(E_SETTINGS % ('тип параметра "%s" должен быть %s' % (pname, ptype.__name__)))
+
+            return v
+
         if os.path.exists(self.configPath):
             with open(self.configPath, 'r', encoding=JSON_ENCODING) as f:
                 d = json.load(f)
@@ -202,9 +213,9 @@ class Config():
 
                 self.databaseFileName = d.get(self.DBFNAME, self.defaultDBFileName)
 
-                self.pixelSamplerMode = d.get(self.SAMPLERMODE, 0)
-                if not isinstance(self.pixelSamplerMode, int):
-                    raise EnvironmentError(E_SETTINGS % ('параметр "%s" должен быть целым числом' % self.SAMPLERMODE))
+                self.pixelSamplerMode = __dict_get(d, self.SAMPLERMODE, int, 0)
+
+                self.statPanedPos = __dict_get(d, self.STATPANEDPOS, int, 0)
 
         # минимальная обработка командной строки
         if len(sys.argv) >= 2:
@@ -215,7 +226,8 @@ class Config():
         tmpd = {self.MAINWINDOW:self.mainWindow.todict(),
             self.SAMPLEDIR:self.imageSampleDirectory,
             self.DBFNAME:self.databaseFileName,
-            self.SAMPLERMODE:self.pixelSamplerMode}
+            self.SAMPLERMODE:self.pixelSamplerMode,
+            self.STATPANEDPOS:self.statPanedPos}
 
         with open(self.configPath, 'w+', encoding=JSON_ENCODING) as f:
             json.dump(tmpd, f, ensure_ascii=False, indent='  ')
