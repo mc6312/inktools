@@ -10,7 +10,7 @@ inkavail.py
 
 inkavailui.py
   MainWnd.load_db()/__bool_s()
-    400: когда-нибудь потом прикрутить тэги для выбора
+    404: когда-нибудь потом прикрутить тэги для выбора
 
 inkrandom.py
   __rc_main()

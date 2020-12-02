@@ -175,6 +175,9 @@ class Config():
         self.defaultDBFileName = os.path.join(os.path.split(os.path.abspath(sys.argv[0]))[0], 'inks.org')
         self.databaseFileName = self.defaultDBFileName
 
+        # значение должно быть установлено снаружи перед вызовом Config.load()
+        self.maxPixelSamplerMode = 1
+
         self.pixelSamplerMode = 0
 
         self.statPanedPos = 0
@@ -214,6 +217,10 @@ class Config():
                 self.databaseFileName = d.get(self.DBFNAME, self.defaultDBFileName)
 
                 self.pixelSamplerMode = __dict_get(d, self.SAMPLERMODE, int, 0)
+                if self.pixelSamplerMode < 0:
+                    self.pixelSamplerMode = 0
+                elif self.pixelSamplerMode > self.maxPixelSamplerMode:
+                    self.pixelSamplerMode = self.maxPixelSamplerMode
 
                 self.statPanedPos = __dict_get(d, self.STATPANEDPOS, int, 0)
 

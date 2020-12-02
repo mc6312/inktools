@@ -28,7 +28,7 @@ from math import sqrt
 from colorsys import rgb_to_hls
 
 
-VERSION = '1.6.2'
+VERSION = '1.6.3'
 TITLE = 'InkTools'
 TITLE_VERSION = '%s v%s' % (TITLE, VERSION)
 COPYRIGHT = '🄯 2020 MC-6312'

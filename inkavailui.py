@@ -101,6 +101,11 @@ class MainWnd():
         self.emacsProcess = None
 
         self.cfg = Config()
+
+        self.cursorSamplers = (('rbtnCursorPixel', self.get_pixbuf_pixel_color),
+                ('rbtnCursorBoxIntenseColor', self.get_pixbuf_intense_color))
+
+        self.cfg.maxPixelSamplerMode = len(self.cursorSamplers) - 1
         self.cfg.load()
 
         resldr = get_resource_loader()
@@ -234,7 +239,9 @@ class MainWnd():
         self.cursorImgViewOX = 7
         self.cursorImgViewOY = 7
 
-        self.cursorImgView = None # будет присвоено потом, когда ebImgView заимеет Gdk.Window
+        # будут присвоены потом, когда ebImgView заимеет Gdk.Window
+        self.cursorOutOfImgView = None
+        self.cursorImgView = None
 
         self.ebImgView.add_events(Gdk.EventMask.BUTTON_PRESS_MASK\
             | Gdk.EventMask.POINTER_MOTION_MASK\
@@ -251,11 +258,7 @@ class MainWnd():
             'btnSampleRemove')
         self.itrSelectedSample = None
 
-        self.cursorSamplers = (('rbtnCursorPixel', self.get_pixbuf_pixel),
-                ('rbtnCursorBoxIntenseColor', self.get_pixbuf_intense_color),
-                ('rbtnCursorBoxDarkest', self.get_pixbuf_darkest_color))
-
-        self.cursorSampler = self.get_pixbuf_pixel
+        self.cursorSampler = self.get_pixbuf_pixel_color
 
         for ix, (rbtnn, sampler) in enumerate(self.cursorSamplers):
             #
@@ -275,7 +278,8 @@ class MainWnd():
         #
         self.cursorColorPixbuf = Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, self.samplePixbufSize, self.samplePixbufSize)
         self.cursorColorPixbuf.fill(self.sampleFillColor)
-        self.imgCursorColor.set_from_pixbuf(self.cursorColorPixbuf)
+
+        self.imgCursorColor.set_from_pixbuf(self.nocoloricon)
 
         #
         self.averageColorPixbuf = Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, self.samplePixbufSize, self.samplePixbufSize)
@@ -625,16 +629,19 @@ class MainWnd():
             self.excludetagstxt,
             self.EXCLUDE_NOTHING)
 
-    def load_image(self, fname):
+    def load_sample_image(self, fname):
+        """Загрузка изображения с образцом чернил в определитель цвета."""
+
         tmppbuf = Pixbuf.new_from_file(fname)
 
         self.pixbufCX = tmppbuf.get_width()
         self.pixbufCY = tmppbuf.get_height()
 
-        # создаём новый, строго заданного формата, мало ли что там загрузилось, м.б. вообще SVG
+        # создаём новый, строго заданного формата, мало ли что там загрузилось
         self.pixbuf = Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, self.pixbufCX, self.pixbufCY)
 
-        self.pixbuf.fill(0x000000ff)
+        # на случай наличия альфа-канала в исходном изображении
+        self.pixbuf.fill(0xffffffff)
 
         tmppbuf.composite(self.pixbuf,
             0, 0, self.pixbufCX, self.pixbufCY,
@@ -645,10 +652,13 @@ class MainWnd():
         self.pixbufChannels = self.pixbuf.get_n_channels()
         self.pixbufRowStride = self.pixbuf.get_rowstride()
 
-        self.swImgView.set_max_content_width(self.pixbufCX)
-        self.swImgView.set_max_content_height(self.pixbufCY)
+        #self.swImgView.set_max_content_width(self.pixbufCX)
+        #self.swImgView.set_max_content_height(self.pixbufCY)
 
         self.imgView.set_from_pixbuf(self.pixbuf)
+
+        self.swImgView.get_hadjustment().set_value(0)
+        self.swImgView.get_vadjustment().set_value(0)
 
         #
         self.lstoreSamples.clear()
@@ -663,7 +673,7 @@ class MainWnd():
 
         self.cfg.imageSampleDirectory = os.path.split(fname)[0]
 
-        self.load_image(fname)
+        self.load_sample_image(fname)
 
     def mnuAverageColor_activate(self, mi):
         self.pages.set_visible_child(self.pageSampler)
@@ -767,7 +777,7 @@ class MainWnd():
 
             return True
 
-    def get_pixbuf_pixel(self, x, y):
+    def get_pixbuf_pixel_color(self, x, y):
         """Получение значения цвета для точки из self.pixbuf
         по координатам x, y.
         Возвращает экземпляр ColorValue, если координаты находятся
@@ -782,49 +792,42 @@ class MainWnd():
                 self.pixbufPixels[pix + 1],
                 self.pixbufPixels[pix + 2])
 
-    def __get_pixel_area_colors(self, x, y):
-        """Возвращает список экземпляров ColorValue для точек
-        self.pixbuf из области 7x7."""
+    def __scan_pixel_area(self, x, y, cmpf):
+        """Просматривает область 7х7 точек вокруг указанных координат.
+        Возвращает экземпляр ColorValue для точки, наиболее
+        подходящей под условие. Если область за пределами изображения,
+        возвращает None.
+
+        x, y    - координаты курсора;
+        cmpf    - функция;
+                  получает два экземпляра ColorValue,
+                  возвращает булевское значение, результат сравнения
+                  цветов."""
 
         # размер области пока приколочен гвоздями
-        colors = []
+
+        retc = None
 
         for ox in range(x - 3, x + 4):
             for oy in range(y - 3, y + 4):
-                c = self.get_pixbuf_pixel(ox, oy)
+                c = self.get_pixbuf_pixel_color(ox, oy)
 
                 if c is not None:
-                    colors.append(c)
+                    if (retc is None) or (cmpf(retc, c)):
+                        retc = c
+                        retc = c
 
-        return colors
+        return retc
 
     def get_pixbuf_intense_color(self, x, y):
-        """Возвращает значение самого насыщенного цвета из
+        """Возвращает значение самого тёмного и насыщенного цвета из
         области 7х7 в виде экземпляра ColorValue.
         Если область за пределами границ self.pixbuf, возвращает None."""
 
-        colors = self.__get_pixel_area_colors(x, y)
+        def __is_intense(clr, otherclr):
+            return (clr.s < otherclr.s) and (clr.l > otherclr.l)
 
-        maxsatc = None
-        for color in colors:
-            if (maxsatc is None) or (maxsatc.s < color.s):
-                maxsatc = color
-
-        return maxsatc
-
-    def get_pixbuf_darkest_color(self, x, y):
-        """Возвращает значение самого тёмного цвета из
-        области 7х7 в виде экземпляра ColorValue.
-        Если область за пределами границ self.pixbuf, возвращает None."""
-
-        colors = self.__get_pixel_area_colors(x, y)
-
-        darkestc = None
-        for color in colors:
-            if (darkestc is None) or (darkestc.l > color.l):
-                darkestc = color
-
-        return darkestc
+        return self.__scan_pixel_area(x, y, __is_intense)
 
     def motion_event(self, x, y):
         self.lensPixbuf.fill(self.sampleFillColor)
@@ -836,10 +839,14 @@ class MainWnd():
 
         if pixelc is None:
             rgbx = '-'
-            cursorColor = self.sampleFillColor
+            samplePixbuf = self.nocoloricon
+            cursor = None if (x < 0) and (y < 0) else self.cursorOutOfImgView
         else:
             rgbx = pixelc.hexv
-            cursorColor = int(pixelc)
+            cursor = self.cursorImgView
+
+            self.cursorColorPixbuf.fill(int(pixelc))
+            samplePixbuf = self.cursorColorPixbuf
 
             sx = x - self.LENS_OX
             sy = y - self.LENS_OY
@@ -875,34 +882,33 @@ class MainWnd():
                     self.LENS_SCALE, self.LENS_SCALE,
                     GdkPixbuf.InterpType.NEAREST)
 
-        self.cursorColorPixbuf.fill(cursorColor)
-        self.imgCursorColor.set_from_pixbuf(self.cursorColorPixbuf)
+        self.imgview_set_cursor(cursor)
+
+        self.imgCursorColor.set_from_pixbuf(samplePixbuf)
         self.imgLens.set_from_pixbuf(self.lensPixbuf)
 
         self.labCursorRGBX.set_text(rgbx)
 
+    def ebImgView_realize(self, wgt):
+        disp = self.ebImgView.get_window().get_display()
+
+        if not self.cursorImgView:
+            self.cursorOutOfImgView = Gdk.Cursor.new_for_display(disp, Gdk.CursorType.X_CURSOR)
+
+            self.cursorImgView = Gdk.Cursor.new_from_pixbuf(disp,
+                self.pixbufCursorImgView,
+                self.cursorImgViewOX, self.cursorImgViewOY)
+
     def imgview_set_cursor(self, cursor):
-        wnd = self.ebImgView.get_window()
-        if wnd:
-            disp = wnd.get_display()
-
-            if not self.cursorImgView:
-                #self.cursorImgView = Gdk.Cursor.new_for_display(disp, Gdk.CursorType.CROSSHAIR)
-                self.cursorImgView = Gdk.Cursor.new_from_pixbuf(disp,
-                    self.pixbufCursorImgView,
-                    self.cursorImgViewOX, self.cursorImgViewOY)
-
-            wnd.set_cursor(cursor)
+        self.ebImgView.get_window().set_cursor(cursor)
 
     def ebImgView_enter_notify_event(self, wgt, event):
-        self.imgview_set_cursor(self.cursorImgView)
         self.motion_event(event.x, event.y)
 
         return True
 
     def ebImgView_leave_notify_event(self, wgt, event):
         self.motion_event(-1, -1)
-        self.imgview_set_cursor(None)
 
         return True
 

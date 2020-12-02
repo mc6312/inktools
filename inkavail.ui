@@ -31,7 +31,8 @@
       <pattern>*.jpg</pattern>
       <pattern>*.jpeg</pattern>
       <pattern>*.png</pattern>
-      <pattern>*.svg</pattern>
+      <pattern>*.webp</pattern>
+      <pattern>*.tif*</pattern>
     </patterns>
   </object>
   <object class="GtkFileFilter" id="filefilterOrgMode">
@@ -175,7 +176,6 @@
                   <object class="GtkMenu">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
-                    <property name="reserve_toggle_size">False</property>
                     <child>
                       <object class="GtkMenuItem" id="mnuFileOpen">
                         <property name="visible">True</property>
@@ -969,6 +969,7 @@
                                 <signal name="enter-notify-event" handler="ebImgView_enter_notify_event" swapped="no"/>
                                 <signal name="leave-notify-event" handler="ebImgView_leave_notify_event" swapped="no"/>
                                 <signal name="motion-notify-event" handler="ebImgView_motion_notify_event" swapped="no"/>
+                                <signal name="realize" handler="ebImgView_realize" swapped="no"/>
                                 <child>
                                   <object class="GtkImage" id="imgView">
                                     <property name="visible">True</property>
@@ -1051,7 +1052,7 @@
                         </child>
                         <child>
                           <object class="GtkRadioButton" id="rbtnCursorPixel">
-                            <property name="label" translatable="yes">точку под курсором</property>
+                            <property name="label" translatable="yes">цвет точки под курсором</property>
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="receives_default">False</property>
@@ -1066,7 +1067,9 @@
                         </child>
                         <child>
                           <object class="GtkRadioButton" id="rbtnCursorBoxIntenseColor">
-                            <property name="label" translatable="yes">самый насыщенный из 7х7</property>
+                            <property name="label" translatable="yes">самый насыщенный
+и тёмный цвет 
+из области 7х7 точек</property>
                             <property name="visible">True</property>
                             <property name="can_focus">True</property>
                             <property name="receives_default">False</property>
@@ -1078,22 +1081,6 @@
                             <property name="expand">False</property>
                             <property name="fill">True</property>
                             <property name="position">3</property>
-                          </packing>
-                        </child>
-                        <child>
-                          <object class="GtkRadioButton" id="rbtnCursorBoxDarkest">
-                            <property name="label" translatable="yes">самый тёмный из 7х7</property>
-                            <property name="visible">True</property>
-                            <property name="can_focus">True</property>
-                            <property name="receives_default">False</property>
-                            <property name="active">True</property>
-                            <property name="draw_indicator">True</property>
-                            <property name="group">rbtnCursorPixel</property>
-                          </object>
-                          <packing>
-                            <property name="expand">False</property>
-                            <property name="fill">True</property>
-                            <property name="position">4</property>
                           </packing>
                         </child>
                         <child>
