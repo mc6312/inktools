@@ -109,7 +109,7 @@ class MainWnd():
         self.cfg.load()
 
         resldr = get_resource_loader()
-        uibldr = get_gtk_builder(resldr, 'inkavail.ui')
+        uibldr = get_gtk_builder(resldr, 'inktools.ui')
 
         Gtk.Settings.get_default().set_property('gtk-application-prefer-dark-theme',
             self.DARK_THEME)
@@ -173,12 +173,6 @@ class MainWnd():
         detailstatswnd.set_min_content_height(WIDGET_BASE_HEIGHT * 24)
 
         self.openorgfiledlg = uibldr.get_object('openorgfiledlg')
-
-        #
-        # таблица чернил с неполными данными
-        #
-        self.missingdataview, self.missingdatalstore = get_ui_widgets(uibldr,
-            'missingdataview missingdatalstore')
 
         # грязный хакЪ из-за ошибки в Glade 3.22.2, криво генерирующей элементы меню со значками
         mnuFile = uibldr.get_object('mnuFile')
@@ -296,8 +290,6 @@ class MainWnd():
         self.window.show_all()
         self.load_window_state()
 
-        self.pageStatistics.set_position(self.cfg.statPanedPos)
-
         uibldr.connect_signals(self)
 
         self.load_db()
@@ -306,9 +298,6 @@ class MainWnd():
         self.aboutDialog.show()
         self.aboutDialog.run()
         self.aboutDialog.hide()
-
-    def pageStatistics_position_notify(self, paned, pos):
-        self.cfg.statPanedPos = paned.get_position()
 
     def rbtnCursorSamplerMode_toggled(self, rbtn, samplerIx):
         if rbtn.get_active():
@@ -321,9 +310,6 @@ class MainWnd():
 
         self.detailstatsview.set_model(None)
         self.detailstatststore.clear()
-
-        self.missingdataview.set_model(None)
-        self.missingdatalstore.clear()
 
         expand = []
 
@@ -356,7 +342,14 @@ class MainWnd():
 
                     expand.append(self.detailstatststore.get_path(itr))
 
-                    for tag, nfo in sorted(tagstat.stats.items(), key=lambda r: r[1].available, reverse=True):
+                    _items = tagstat.stats.items()
+
+                    # мелкий костылинг: сортироваться должны только списки,
+                    # полученные обработкой директив TAGSTATS
+                    if not tagstat.isspecial:
+                        _items = sorted(_items, key=lambda r: r[1].available, reverse=True)
+
+                    for tag, nfo in _items:
                         row = (None, self.stats.get_tag_display_name(tag),
                             *nfo.counter_strs(), None,
                             None)
@@ -384,6 +377,9 @@ class MainWnd():
                             if _inkavail:
                                 hint.append('В наличии: %s' % markup_escape_text(_inkavail))
 
+                            if ink.missing:
+                                hint.append('Отсутствуют данные: %s' % self.stats.get_ink_missing_data_str(ink))
+
                             self.detailstatststore.append(subitr,
                                     (ink,
                                     markup_escape_text(ink.text),
@@ -393,13 +389,6 @@ class MainWnd():
                                     pbuf,
                                     '\n\n'.join(hint)))
 
-                #
-                # записи с неполными данными
-                #
-                for ink in sorted(self.stats.hasMissingData, key=lambda i: i.text):
-                    self.missingdatalstore.append((ink,
-                        ink.text,
-                        ', '.join(map(lambda k: self.stats.STR_MISSING[k], ink.missing))))
 
                 #TODO когда-нибудь потом прикрутить тэги для выбора
                 self.rndchooser = RandomInkChooser(self.stats, None, None)
@@ -441,7 +430,6 @@ class MainWnd():
             self.headerbar.set_subtitle(dfname)
 
         finally:
-            self.missingdataview.set_model(self.missingdatalstore)
             self.detailstatsview.set_model(self.detailstatststore)
 
             for path in expand:
@@ -450,12 +438,6 @@ class MainWnd():
             self.totalstatview.set_model(self.totalstatlstore)
 
         self.choose_random_ink()
-
-    def missingdataview_row_activated(self, tv, path, col):
-        ink = self.missingdatalstore.get_value(self.missingdatalstore.get_iter(path), 0)
-
-        if ink:
-            self.show_ink(ink, True)
 
     def detailstatsview_row_activated(self, tv, path, col):
         ink = self.detailstatststore.get_value(self.detailstatststore.get_iter(path),

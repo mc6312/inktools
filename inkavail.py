@@ -26,9 +26,10 @@ from orgmodeparser import *
 import re
 from math import sqrt
 from colorsys import rgb_to_hls
+from collections import OrderedDict
 
 
-VERSION = '1.6.3'
+VERSION = '1.7.0'
 TITLE = 'InkTools'
 TITLE_VERSION = '%s v%s' % (TITLE, VERSION)
 COPYRIGHT = '🄯 2020 MC-6312'
@@ -253,10 +254,29 @@ class TagStatInfo():
                 self.available, self.unavailable, self.unwanted, self.inks)
 
         def counter_strs(self):
+            """Возвращает кортеж из строк со значениями счётчиков
+            для отображения."""
+
             def __to_str(i):
                 return '-' if i == 0 else str(i)
 
             return (__to_str(self.available), __to_str(self.unavailable), __to_str(self.unwanted))
+
+        def add_ink(self, inknode):
+            """Обновляет счётчики, добавляет чернила в список.
+
+            inknode - экземпляр OrgHeadlineNode."""
+
+            if inknode.avail:
+                self.available += 1
+            else:
+                # inknode.avail == False:
+                self.unavailable += 1
+
+            if inknode.done is None:
+                self.unwanted += 1
+
+            self.inks.append(inknode)
 
     def __init__(self, totals, title, col1title, tags):
         """Параметры:
@@ -264,21 +284,48 @@ class TagStatInfo():
                       которому принадлежит текущий экземпляр TagStatInfo;
         title       - название статистической таблицы;
         col1title   - название первого столбца;
-        tags        - список меток, которые учитывать."""
+        tags        - список меток, которые следует учитывать"""
 
         self.totalstats = totals
         self.title = title
         self.col1title = col1title
-        self.tags = set(tags) # все метки, которые учитываем
-        self.stats = dict() # ключ - метка, значение - экземпляр TagStatValue
+
+        # все метки, которые учитываем
+        self.tags = set(tags)
+
+        # ключ - метка, значение - экземпляр TagStatValue
+        self.stats = OrderedDict()
+
+        # специальный флаг для UI
+        self.isspecial = False
 
     def __repr__(self):
         return '%s(title="%s", col1title="%s", tags=%s, stats=%s)' % (self.__class__.__name__,
             self.title, self.col1title, self.tags, self.stats)
 
+    def add_special_value(self, name, inks):
+        """Создание и добавление в self.stats специального экземпляра
+        TagStatValue.
+
+        name    - строка, имя псевдометки;
+        inks    - список экземпляров OrgHeadlineNode."""
+
+        nfo = self.TagStatValue()
+
+        for ink in inks:
+            nfo.add_ink(ink)
+
+        self.stats[name] = nfo
+
     def gather_statistics(self, inknode):
-        # учитываем чернила в статистике, если у них есть общие метки
-        # с нашими
+        """Учёт чернил в статистике, если у них есть метки, совпадающие
+        с self.tags.
+
+        inknode - экземпляр OrgHeadlineNode.
+
+        Метод возвращает булевское значение: True, если чернила
+        попали в статистику, иначе - False."""
+
         ntags = set(inknode.tags) & self.tags
 
         for tag in ntags:
@@ -288,16 +335,11 @@ class TagStatInfo():
                 nfo = self.TagStatValue()
                 self.stats[tag] = nfo
 
-            if inknode.avail:
-                nfo.available += 1
-            else:
-                # inknode.avail == False:
-                nfo.unavailable += 1
+            nfo.add_ink(inknode)
 
-            if inknode.done is None:
-                nfo.unwanted += 1
+            return True
 
-            nfo.inks.append(inknode)
+        return False
 
 
 class InkNodeStatistics():
@@ -314,9 +356,6 @@ class InkNodeStatistics():
         # (ветви, которые и не TODO, и не DONE)
         self.unwantedInks = []
 
-        # список экземпляров OrgHeadlineNode с неполными данными
-        self.hasMissingData = []
-
         # список экземпляров TagStatInfo - статистика по тэгам
         self.tagStats = []
 
@@ -324,7 +363,32 @@ class InkNodeStatistics():
         # где ключ - тэг, а значение - перевод названия
         self.tagNames = {}
 
+        # временный список экземпляров OrgHeadlineNode с неполными данными
+        self.hasMissingData = []
+
+        # временный список экземпляров OrgHeadlineNode, которые не попали
+        # в списки tagStats
+        self.outOfStatsInks = []
+
+        #
+        # рекурсивный обход ветвей
+        #
         self.scan_node(rootnode, 0)
+
+        # ...а теперь из hasMissingData и outOfStatsInks делаем
+        # специальную ветку в tagStats
+
+        others = TagStatInfo(self, 'Прочие', '...', [])
+        others.isspecial = True
+        others.add_special_value('прочие метки', self.outOfStatsInks)
+        others.add_special_value('с неполными данными', self.hasMissingData)
+
+        self.tagStats.append(others)
+
+        # потому что содержимое уже лежит в others,
+        # и в виде отдельной сущности больше не нужно
+        del self.hasMissingData
+        del self.outOfStatsInks
 
         # список всех меток
         self.tags = []
@@ -370,14 +434,15 @@ class InkNodeStatistics():
                ]
 
     def __repr__(self):
-        return '%s(availMl=%.2f, availInks=%s, unavailInks=%s, unwantedInks=%s, hasMissingData=%s, tagStats=%s)' % (
+        return '%s(availMl=%.2f, availInks=%s, unavailInks=%s, unwantedInks=%s, hasMissingData=%s, tagStats=%s, outOfStatsInks=%s)' % (
             self.__class__.__name__,
             self.availMl,
             self.availInks,
             self.unavailInks,
             self.unwantedInks,
             self.hasMissingData,
-            self.tagStats)
+            self.tagStats,
+            self.outOfStatsInks)
 
     # флаги для проверки полноты описания
     MISSING_TAGS, MISSING_DESCRIPTION, MISSING_COLOR = range(3)
@@ -522,8 +587,14 @@ class InkNodeStatistics():
         #
         # скармливаем всё, что следует, статистике "по тэгам"
         #
+        ninstats = 0
+
         for tagstat in self.tagStats:
-            tagstat.gather_statistics(node)
+            if tagstat.gather_statistics(node):
+                ninstats += 1
+
+        if ninstats == 0:
+            self.outOfStatsInks.append(node)
 
         return True
 
@@ -658,6 +729,13 @@ class InkNodeStatistics():
                 ', '.join(sorted(map(lambda tag: self.tagNames[tag] if tag in self.tagNames else tag, disptags))),
                 '\n'.join(desc),
                 ' и '.join(avails))
+
+    def get_ink_missing_data_str(self, ink):
+        """Возвращает строку, в которой перечислены недостающие данные
+        для ink (экземпляра OrgHeadlineNode), или пустую строку
+        (когда всё данные есть)."""
+
+        return ', '.join(map(lambda k: self.STR_MISSING[k], ink.missing))
 
 
 def load_ink_db(fname):
