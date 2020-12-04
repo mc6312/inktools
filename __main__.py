@@ -20,5 +20,5 @@
 
 if __name__ == '__main__':
     import sys
-    from inkavailui import main
+    from inktools import main
     sys.exit(main())
