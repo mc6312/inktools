@@ -174,10 +174,17 @@ class MainWnd():
 
         self.openorgfiledlg = uibldr.get_object('openorgfiledlg')
 
+        #
+        # главное меню
+        #
+
         # грязный хакЪ из-за ошибки в Glade 3.22.2, криво генерирующей элементы меню со значками
-        mnuFile = uibldr.get_object('mnuFile')
-        img = Gtk.Image.new_from_icon_name('open-menu-symbolic', Gtk.IconSize.MENU)
-        mnuFile.add(img)
+        # пока это всё оторву - пущай будет человеческое меню, а не гномье
+        #mnuFile = uibldr.get_object('mnuFile')
+        #img = Gtk.Image.new_from_icon_name('open-menu-symbolic', Gtk.IconSize.MENU)
+        #mnuFile.add(img)
+
+        self.mnuFileOpenRecent = uibldr.get_object('mnuFileOpenRecent')
 
         #
         # страница случайного выбора чернил
@@ -289,10 +296,54 @@ class MainWnd():
         #
         self.window.show_all()
         self.load_window_state()
+        self.update_recent_files_menu()
 
         uibldr.connect_signals(self)
 
         self.load_db()
+
+    def update_recent_files_menu(self):
+        if not self.cfg.recentFiles:
+            self.mnuFileOpenRecent.set_submenu()
+        else:
+            mnu = Gtk.Menu.new()
+            mnu.set_reserve_toggle_size(False)
+
+            for ix, rfn in enumerate(self.cfg.recentFiles):
+                # сокращаем отображаемое имя файла, длину пока приколотим гвоздями
+                #TODO когда-нибудь сделать сокращение отображаемого в меню имени файла по человечески
+                lrfn = len(rfn)
+                if lrfn > 40:
+                    disprfn = '%s...%s' % (rfn[:3], rfn[lrfn - 34:])
+                else:
+                    disprfn = rfn
+
+                mi = Gtk.MenuItem.new_with_label(disprfn)
+                mi.connect('activate', self.file_open_recent, ix)
+                mnu.append(mi)
+
+            mnu.show_all()
+
+            self.mnuFileOpenRecent.set_submenu(mnu)
+
+    def file_open_recent(self, wgt, ix):
+        fname = self.cfg.recentFiles[ix]
+
+        # проверяем наличие файла обязательно, т.к. в списке недавних
+        # могут быть уже удалённые файлы или лежащие на внешних
+        # неподключённых носителях
+        # при этом метод file_open_filename() проверку производить
+        # не должен, т.к. в первую очередь расчитан на вызов после
+        # диалога выбора файла, который несуществующего файла не вернёт.
+        # кроме того, сообщение об недоступном файле _здесь_ должно
+        # отличаться от просто "нету файла"
+
+        if not os.path.exists(fname):
+            msg_dialog(self.window, TITLE,
+                'Файл "%s" отсутствует или недоступен' % fname)
+        else:
+            self.cfg.databaseFileName = fname
+            self.load_db()
 
     def mnuFileAbout_activate(self, mi):
         self.aboutDialog.show()
@@ -346,7 +397,8 @@ class MainWnd():
 
                     # мелкий костылинг: сортироваться должны только списки,
                     # полученные обработкой директив TAGSTATS
-                    if not tagstat.isspecial:
+                    if tagstat.issortable:
+                        # первыми идут группы чернил, которых больше всего в наличии
                         _items = sorted(_items, key=lambda r: r[1].available, reverse=True)
 
                     for tag, nfo in _items:
@@ -356,7 +408,8 @@ class MainWnd():
 
                         subitr = self.detailstatststore.append(itr, row)
 
-                        for ink in sorted(nfo.inks, key=lambda i: i.text):
+                        # конкретные марки чернил сортируем уже по названию в алфавитном порядке
+                        for ink in sorted(nfo.inks, key=lambda i: i.text.lower()):
                             if ink.color:
                                 pbuf = Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, self.samplePixbufSize, self.samplePixbufSize)
                                 pbuf.fill(int(ColorValue.get_rgb32_value(ink.color)))
@@ -369,7 +422,8 @@ class MainWnd():
                             hint = ['<b>%s</b>' % markup_escape_text(_inkname)]
 
                             if ink.color:
-                                hint.append('Цвет: %s' % markup_escape_text(ColorValue.new_from_rgb24(ink.color).get_description()))
+                                hint.append('Цвет: <span color="#%.6x">██</span> %s' % (ink.color,
+                                    markup_escape_text(ColorValue.new_from_rgb24(ink.color).get_description())))
 
                             if _inkdesc:
                                 hint.append(markup_escape_text(_inkdesc))
@@ -428,6 +482,9 @@ class MainWnd():
 
             self.openorgfiledlg.select_filename(self.cfg.databaseFileName)
             self.headerbar.set_subtitle(dfname)
+
+            self.cfg.add_recent_file(self.cfg.databaseFileName)
+            self.update_recent_files_menu()
 
         finally:
             self.detailstatsview.set_model(self.detailstatststore)

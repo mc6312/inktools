@@ -157,8 +157,12 @@ class Config():
     DBFNAME = 'database_file_name'
     SAMPLERMODE = 'pixel_sampler_mode'
 
+    RECENTFILES = 'recentfiles'
+
     CFGFN = 'settings.json'
     CFGAPP = 'inktools'
+
+    MAX_RECENT_FILES = 16 # ибо нефиг
 
     def __init__(self):
         #
@@ -178,6 +182,9 @@ class Config():
         self.maxPixelSamplerMode = 1
 
         self.pixelSamplerMode = 0
+
+        # ранее открывавшиеся файлы (список строк)
+        self.recentFiles = []
 
         # определяем каталог для настроек
         # или принудительно создаём, если его ещё нет
@@ -219,10 +226,40 @@ class Config():
                 elif self.pixelSamplerMode > self.maxPixelSamplerMode:
                     self.pixelSamplerMode = self.maxPixelSamplerMode
 
+                #
+                # список открывавшихся файлов
+                #
+                rfl = __dict_get(d, self.RECENTFILES, list, [])
+
+                self.recentFiles.clear()
+
+                for ix, rfn in enumerate(rfl, 1):
+                    if not isinstance(rfn, str):
+                        raise TypeError(E_SETTINGS % ('недопустимый тип элемента #%d списка "%s"' % (ix, self.RECENTFILES)))
+
+                    rfn = rfn.strip()
+                    if not rfn:
+                        continue
+
+                    # проверку на наличие файлов - пока нафиг: а вдруг оне на флэшке невоткнутой?
+                    #if not os.path.exists(rfn):
+                    #    continue
+
+                    self.add_recent_file(rfn)
+
         # минимальная обработка командной строки
         if len(sys.argv) >= 2:
             # путь к БД, указанный в командной строке, имеет приоритет перед настройками из файла
             self.databaseFileName = os.path.abspath(os.path.expanduser(sys.argv[1]))
+
+    def add_recent_file(self, fname):
+        try:
+            self.recentFiles.index(fname)
+        except ValueError:
+            self.recentFiles.append(fname)
+
+            if len(self.recentFiles) > self.MAX_RECENT_FILES:
+                del self.recentFiles[0]
 
     def save(self):
         tmpd = {self.MAINWINDOW:self.mainWindow.todict(),
@@ -230,17 +267,21 @@ class Config():
             self.DBFNAME:self.databaseFileName,
             self.SAMPLERMODE:self.pixelSamplerMode}
 
+        if self.recentFiles:
+            tmpd[self.RECENTFILES] = self.recentFiles
+
         with open(self.configPath, 'w+', encoding=JSON_ENCODING) as f:
             json.dump(tmpd, f, ensure_ascii=False, indent='  ')
 
     def __repr__(self):
         # для отладки
 
-        return '%s(configDir="%s", configPath="%s", mainWindow=%s, imageSampleDirectory="%s", databaseFileName="%s", pixelSamplerMode=%d)' % (
+        return '%s(configDir="%s", configPath="%s", mainWindow=%s, imageSampleDirectory="%s", databaseFileName="%s", pixelSamplerMode=%d, recentFiles=%s)' % (
             self.__class__.__name__,
             self.configDir, self.configPath, self.mainWindow,
             self.imageSampleDirectory, self.databaseFileName,
-            self.pixelSamplerMode)
+            self.pixelSamplerMode,
+            self.recentFiles)
 
 
 def main(args):

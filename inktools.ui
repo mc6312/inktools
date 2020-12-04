@@ -162,6 +162,7 @@
               <object class="GtkMenuItem" id="mnuFile">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
+                <property name="label" translatable="yes">Файл</property>
                 <child type="submenu">
                   <object class="GtkMenu">
                     <property name="visible">True</property>
@@ -174,6 +175,14 @@
                         <property name="use_underline">True</property>
                         <signal name="activate" handler="mnuFileOpen_activate" swapped="no"/>
                         <accelerator key="o" signal="activate" modifiers="GDK_CONTROL_MASK"/>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="mnuFileOpenRecent">
+                        <property name="visible">True</property>
+                        <property name="can_focus">False</property>
+                        <property name="label" translatable="yes">Недавние файлы</property>
+                        <property name="use_underline">True</property>
                       </object>
                     </child>
                     <child>
@@ -194,42 +203,6 @@
                         <property name="use_underline">True</property>
                         <signal name="activate" handler="mnuFileEdit_activate" swapped="no"/>
                         <accelerator key="e" signal="activate" modifiers="GDK_CONTROL_MASK"/>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkSeparatorMenuItem">
-                        <property name="visible">True</property>
-                        <property name="can_focus">False</property>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkMenuItem" id="mnuRandomChoice">
-                        <property name="visible">True</property>
-                        <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">Выбрать случайные чернила</property>
-                        <property name="use_underline">True</property>
-                        <signal name="activate" handler="mnuRandomChoice_activate" swapped="no"/>
-                        <accelerator key="r" signal="activate" modifiers="GDK_CONTROL_MASK"/>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkMenuItem" id="mnuEditChosenInk">
-                        <property name="visible">True</property>
-                        <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">Открыть БД на выбранных чернилах</property>
-                        <property name="use_underline">True</property>
-                        <signal name="activate" handler="mnuEditChosenInk_activate" swapped="no"/>
-                        <accelerator key="e" signal="activate" modifiers="GDK_SHIFT_MASK | GDK_CONTROL_MASK"/>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkMenuItem" id="mnuAverageColor">
-                        <property name="visible">True</property>
-                        <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">Определить цвет</property>
-                        <property name="use_underline">True</property>
-                        <signal name="activate" handler="mnuAverageColor_activate" swapped="no"/>
-                        <accelerator key="f" signal="activate" modifiers="GDK_CONTROL_MASK"/>
                       </object>
                     </child>
                     <child>
@@ -261,7 +234,60 @@
                 </child>
               </object>
             </child>
+            <child>
+              <object class="GtkMenuItem" id="mnuInks">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="label" translatable="yes">Чернила</property>
+                <property name="use_underline">True</property>
+                <child type="submenu">
+                  <object class="GtkMenu">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <child>
+                      <object class="GtkMenuItem" id="mnuRandomChoice">
+                        <property name="visible">True</property>
+                        <property name="can_focus">False</property>
+                        <property name="label" translatable="yes">Выбрать случайные чернила</property>
+                        <property name="use_underline">True</property>
+                        <signal name="activate" handler="mnuRandomChoice_activate" swapped="no"/>
+                        <accelerator key="r" signal="activate" modifiers="GDK_CONTROL_MASK"/>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="mnuEditChosenInk">
+                        <property name="visible">True</property>
+                        <property name="can_focus">False</property>
+                        <property name="label" translatable="yes">Открыть БД на выбранных чернилах</property>
+                        <property name="use_underline">True</property>
+                        <signal name="activate" handler="mnuEditChosenInk_activate" swapped="no"/>
+                        <accelerator key="e" signal="activate" modifiers="GDK_SHIFT_MASK | GDK_CONTROL_MASK"/>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="mnuAverageColor">
+                        <property name="visible">True</property>
+                        <property name="can_focus">False</property>
+                        <property name="label" translatable="yes">Определить цвет</property>
+                        <property name="use_underline">True</property>
+                        <signal name="activate" handler="mnuAverageColor_activate" swapped="no"/>
+                        <accelerator key="f" signal="activate" modifiers="GDK_CONTROL_MASK"/>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+              </object>
+            </child>
           </object>
+        </child>
+        <child>
+          <object class="GtkSeparator">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+          </object>
+          <packing>
+            <property name="position">1</property>
+          </packing>
         </child>
         <child>
           <object class="GtkStackSwitcher" id="pageSwitcher">
@@ -270,7 +296,7 @@
             <property name="stack">pages</property>
           </object>
           <packing>
-            <property name="position">1</property>
+            <property name="position">2</property>
           </packing>
         </child>
       </object>

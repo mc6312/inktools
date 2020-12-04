@@ -296,8 +296,9 @@ class TagStatInfo():
         # ключ - метка, значение - экземпляр TagStatValue
         self.stats = OrderedDict()
 
-        # специальный флаг для UI
-        self.isspecial = False
+        # флаг для UI: если True, элементы stats при отображении
+        # должны быть отсортированы; как именно - на совести UI
+        self.issortable = True
 
     def __repr__(self):
         return '%s(title="%s", col1title="%s", tags=%s, stats=%s)' % (self.__class__.__name__,
@@ -379,11 +380,16 @@ class InkNodeStatistics():
         # специальную ветку в tagStats
 
         others = TagStatInfo(self, 'Прочие', '...', [])
-        others.isspecial = True
-        others.add_special_value('прочие метки', self.outOfStatsInks)
-        others.add_special_value('с неполными данными', self.hasMissingData)
+        others.issortable = False
 
-        self.tagStats.append(others)
+        if self.outOfStatsInks:
+            others.add_special_value('прочие метки', self.outOfStatsInks)
+
+        if self.hasMissingData:
+            others.add_special_value('с неполными данными', self.hasMissingData)
+
+        if others.stats:
+            self.tagStats.append(others)
 
         # потому что содержимое уже лежит в others,
         # и в виде отдельной сущности больше не нужно
