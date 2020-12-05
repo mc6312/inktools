@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-""" inkavailui.py
+""" inktools.py
 
     Copyright 2020 MC-6312 <mc6312@gmail.com>
 
@@ -60,8 +60,8 @@ class MainWnd():
     MAX_COLOR_SAMPLES = 32
 
     DET_COL_INK, DET_COL_LABEL,\
-    DET_COL_AVAIL, DET_COL_UNAVAIL, DET_COL_UNWANTED,\
-    DET_COL_COLOR, DET_COL_HINT = range(7)
+    DET_COL_AVAIL, DET_COL_UNAVAIL, DET_COL_WANTED, DET_COL_UNWANTED,\
+    DET_COL_COLOR, DET_COL_HINT = range(8)
 
     SAMPLE_COL_VALUE, SAMPLE_COL_HINT, SAMPLE_COL_PIX = range(3)
 
@@ -190,15 +190,18 @@ class MainWnd():
         # страница случайного выбора чернил
         #
         self.randominkname, self.randominktags, self.randominkdesc,\
-        self.randominkavail, self.randominkcolorimg, self.randominkcolordesc = get_ui_widgets(uibldr,
+        self.randominkavail, self.randominkstatus,\
+        self.randominkcolorimg, self.randominkcolordesc = get_ui_widgets(uibldr,
             'randominkname', 'randominktags', 'randominkdesc',
-            'randominkavail', 'randominkcolorimg', 'randominkcolordesc')
+            'randominkavail', 'randominkstatus', 'randominkcolorimg',
+            'randominkcolordesc')
         self.randominkdescbuf = self.randominkdesc.get_buffer()
 
         self.includetagstxt, self.excludetagstxt, self.tagchooserdlg = get_ui_widgets(uibldr,
             'includetagstxt', 'excludetagstxt', 'tagchooserdlg')
 
-        self.randominkColorPixbuf = Pixbuf.new(GdkPixbuf.Colorspace.RGB, False, 8, self.samplePixbufSize, self.samplePixbufSize)
+        self.randominkColorPixbuf = Pixbuf.new(GdkPixbuf.Colorspace.RGB,
+            False, 8, self.samplePixbufSize, self.samplePixbufSize)
 
         self.tagchecklistbox = CheckListBox(selectionbuttons=True)
         # костыль
@@ -389,7 +392,7 @@ class MainWnd():
                 #
                 for tagstat in self.stats.tagStats:
                     itr = self.detailstatststore.append(None,
-                            (None, tagstat.title, '', '', '', None, None))
+                            (None, tagstat.title, '', '', '', '', None, None))
 
                     expand.append(self.detailstatststore.get_path(itr))
 
@@ -431,14 +434,18 @@ class MainWnd():
                             if _inkavail:
                                 hint.append('В наличии: %s' % markup_escape_text(_inkavail))
 
+                            if ink.done == False:
+                                hint.append('Запланирована покупка этих чернил')
+
                             if ink.missing:
                                 hint.append('Отсутствуют данные: %s' % self.stats.get_ink_missing_data_str(ink))
 
                             self.detailstatststore.append(subitr,
                                     (ink,
-                                    markup_escape_text(ink.text),
+                                    ink.text,
                                     __bool_s(ink.avail),
                                     __bool_s(not ink.avail),
+                                    __bool_s(ink.done == False), # прямое сравнение, т.к. иначе None будет воспринято тоже как False
                                     __bool_s(ink.done is None),
                                     pbuf,
                                     '\n\n'.join(hint)))
@@ -508,6 +515,7 @@ class MainWnd():
         inktagst = '-'
         inkdesct = ''
         inkavailt = '-'
+        inkstatust = '-'
         inkcolordesc = '' # тут когда-нибудь будет человекочитаемое описание цвета
         inkcolor = None
 
@@ -523,6 +531,13 @@ class MainWnd():
             inkdesct = inkDescription
             inkavailt = markup_escape_text(inkAvailability)
 
+            if ink.done is None:
+                inkstatust = 'не нужны'
+            elif ink.done:
+                inkstatust = 'испытаны'
+            else:
+                inkstatust = 'планируется покупка'
+
             if ink.color:
                 inkcolor = ColorValue.get_rgb32_value(ink.color)
                 inkcolordesc = ColorValue.new_from_rgb24(ink.color).get_description()
@@ -531,6 +546,7 @@ class MainWnd():
         self.randominktags.set_markup(inktagst)
         self.randominkdescbuf.set_text(inkdesct)
         self.randominkavail.set_markup(inkavailt)
+        self.randominkstatus.set_text(inkstatust)
         self.randominkcolordesc.set_text(inkcolordesc)
 
         if inkcolor is None:

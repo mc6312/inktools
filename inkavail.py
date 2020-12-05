@@ -29,7 +29,7 @@ from colorsys import rgb_to_hls
 from collections import OrderedDict
 
 
-VERSION = '1.7.0'
+VERSION = '1.8.0'
 TITLE = 'InkTools'
 TITLE_VERSION = '%s v%s' % (TITLE, VERSION)
 COPYRIGHT = '🄯 2020 MC-6312'
@@ -241,17 +241,18 @@ class ColorValue():
 
 class TagStatInfo():
     class TagStatValue():
-        __slots__ = 'available', 'unavailable', 'unwanted', 'inks'
+        __slots__ = 'available', 'unavailable', 'wanted', 'unwanted', 'inks'
 
         def __init__(self):
             self.available = 0
             self.unavailable = 0
+            self.wanted = 0
             self.unwanted = 0
             self.inks = [] # список всех экземпляров OrgHeadlineNode, соответствующих тэгу
 
         def __repr__(self):
-            return '%s(available=%d, unavailable=%d, unwanted=%d, inks=%s)' % (self.__class__.__name__,
-                self.available, self.unavailable, self.unwanted, self.inks)
+            return '%s(available=%d, unavailable=%d, wanted=%d, unwanted=%d, inks=%s)' % (self.__class__.__name__,
+                self.available, self.unavailable, self.wanted, self.unwanted, self.inks)
 
         def counter_strs(self):
             """Возвращает кортеж из строк со значениями счётчиков
@@ -260,7 +261,8 @@ class TagStatInfo():
             def __to_str(i):
                 return '-' if i == 0 else str(i)
 
-            return (__to_str(self.available), __to_str(self.unavailable), __to_str(self.unwanted))
+            return (__to_str(self.available), __to_str(self.unavailable),
+                    __to_str(self.wanted), __to_str(self.unwanted))
 
         def add_ink(self, inknode):
             """Обновляет счётчики, добавляет чернила в список.
@@ -275,6 +277,8 @@ class TagStatInfo():
 
             if inknode.done is None:
                 self.unwanted += 1
+            elif not inknode.done:
+                self.wanted += 1
 
             self.inks.append(inknode)
 
@@ -778,11 +782,6 @@ def __test_stats():
         for tagstat in stats.tagStats:
             print('\n%s' % tagstat.title)
             print(tagstat.stats)
-
-        print('\n\nС неполными данными:')
-        for ink in stats.hasMissingData:
-            print('%s: %s' % (ink.text,
-                ', '.join(map(lambda k: stats.STR_MISSING[k], ink.missing))))
 
     return 0
 

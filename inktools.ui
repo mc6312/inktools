@@ -12,6 +12,8 @@
       <column type="gchararray"/>
       <!-- column-name unavail -->
       <column type="gchararray"/>
+      <!-- column-name wanted -->
+      <column type="gchararray"/>
       <!-- column-name unwanted -->
       <column type="gchararray"/>
       <!-- column-name coloricon -->
@@ -411,7 +413,7 @@
                         <property name="model">detailstatststore</property>
                         <property name="headers_clickable">False</property>
                         <property name="enable_grid_lines">both</property>
-                        <property name="tooltip_column">6</property>
+                        <property name="tooltip_column">7</property>
                         <signal name="row-activated" handler="detailstatsview_row_activated" swapped="no"/>
                         <child internal-child="selection">
                           <object class="GtkTreeSelection"/>
@@ -434,7 +436,7 @@
                             <child>
                               <object class="GtkCellRendererPixbuf" id="crcoloricon"/>
                               <attributes>
-                                <attribute name="pixbuf">5</attribute>
+                                <attribute name="pixbuf">6</attribute>
                               </attributes>
                             </child>
                           </object>
@@ -468,6 +470,20 @@
                           </object>
                         </child>
                         <child>
+                          <object class="GtkTreeViewColumn" id="colwanted">
+                            <property name="title" translatable="yes">П/п</property>
+                            <property name="alignment">1</property>
+                            <child>
+                              <object class="GtkCellRendererText" id="crwanted">
+                                <property name="xalign">1</property>
+                              </object>
+                              <attributes>
+                                <attribute name="text">4</attribute>
+                              </attributes>
+                            </child>
+                          </object>
+                        </child>
+                        <child>
                           <object class="GtkTreeViewColumn" id="colunwanted">
                             <property name="title" translatable="yes">Н/н</property>
                             <property name="alignment">1</property>
@@ -476,7 +492,7 @@
                                 <property name="xalign">1</property>
                               </object>
                               <attributes>
-                                <attribute name="text">4</attribute>
+                                <attribute name="text">5</attribute>
                               </attributes>
                             </child>
                           </object>
@@ -670,6 +686,29 @@
                       <packing>
                         <property name="left_attach">1</property>
                         <property name="top_attach">2</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="visible">True</property>
+                        <property name="can_focus">False</property>
+                        <property name="label" translatable="yes">Статус:</property>
+                        <property name="xalign">0</property>
+                      </object>
+                      <packing>
+                        <property name="left_attach">0</property>
+                        <property name="top_attach">5</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="randominkstatus">
+                        <property name="visible">True</property>
+                        <property name="can_focus">False</property>
+                        <property name="xalign">0</property>
+                      </object>
+                      <packing>
+                        <property name="left_attach">1</property>
+                        <property name="top_attach">5</property>
                       </packing>
                     </child>
                   </object>
