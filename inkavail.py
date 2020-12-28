@@ -29,7 +29,7 @@ from colorsys import rgb_to_hls
 from collections import OrderedDict
 
 
-VERSION = '1.8.0'
+VERSION = '1.8.1'
 TITLE = 'InkTools'
 TITLE_VERSION = '%s v%s' % (TITLE, VERSION)
 COPYRIGHT = '🄯 2020 MC-6312'

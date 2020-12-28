@@ -367,8 +367,13 @@ class MainWnd():
 
         expand = []
 
-        def __bool_s(b):
-            return '√' if b else ''
+        def __bool_s(b, clr=None):
+            st = '√' if clr is None else '<span color="%s"><b>√</b></span>' % clr
+            return st if b else ''
+
+        CTODO = '#fd0'
+        CNODO = '#c00'
+        CDONE = '#0f0'
 
         try:
             self.db = load_ink_db(self.cfg.databaseFileName)
@@ -440,18 +445,21 @@ class MainWnd():
                             if ink.missing:
                                 hint.append('Отсутствуют данные: %s' % self.stats.get_ink_missing_data_str(ink))
 
+                            bunwanted = ink.done is None
                             self.detailstatststore.append(subitr,
                                     (ink,
                                     ink.text,
-                                    __bool_s(ink.avail),
-                                    __bool_s(not ink.avail),
-                                    __bool_s(ink.done == False), # прямое сравнение, т.к. иначе None будет воспринято тоже как False
-                                    __bool_s(ink.done is None),
+                                    # avail
+                                    __bool_s(ink.avail, CDONE),
+                                    # unavail
+                                    __bool_s(not ink.avail, None if bunwanted else CTODO),
+                                    # wanted
+                                    __bool_s(ink.done == False, CTODO), # прямое сравнение, т.к. иначе None будет воспринято тоже как False
+                                    # unwanted
+                                    __bool_s(bunwanted, CNODO),
                                     pbuf,
                                     '\n\n'.join(hint)))
 
-
-                #TODO когда-нибудь потом прикрутить тэги для выбора
                 self.rndchooser = RandomInkChooser(self.stats, None, None)
 
             else:
