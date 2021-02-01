@@ -166,8 +166,8 @@ class MainWnd():
         self.totalstatlstore, self.totalstatview = get_ui_widgets(uibldr,
             'totalstatlstore', 'totalstatview')
 
-        self.detailstatststore, self.detailstatsview, detailstatswnd = get_ui_widgets(uibldr,
-            'detailstatststore detailstatsview detailstatswnd')
+        self.detailstats = TreeViewShell.new_from_uibuilder(uibldr, 'detailstatsview')
+        detailstatswnd = uibldr.get_object('detailstatswnd')
 
         # костылинг
         detailstatswnd.set_min_content_height(WIDGET_BASE_HEIGHT * 24)
@@ -362,8 +362,8 @@ class MainWnd():
         self.totalstatview.set_model(None)
         self.totalstatlstore.clear()
 
-        self.detailstatsview.set_model(None)
-        self.detailstatststore.clear()
+        self.detailstats.view.set_model(None)
+        self.detailstats.store.clear()
 
         expand = []
 
@@ -396,10 +396,10 @@ class MainWnd():
                 # детали
                 #
                 for tagstat in self.stats.tagStats:
-                    itr = self.detailstatststore.append(None,
+                    itr = self.detailstats.store.append(None,
                             (None, tagstat.title, '', '', '', '', None, None))
 
-                    expand.append(self.detailstatststore.get_path(itr))
+                    expand.append(self.detailstats.store.get_path(itr))
 
                     _items = tagstat.stats.items()
 
@@ -414,7 +414,7 @@ class MainWnd():
                             *nfo.counter_strs(), None,
                             None)
 
-                        subitr = self.detailstatststore.append(itr, row)
+                        subitr = self.detailstats.store.append(itr, row)
 
                         # конкретные марки чернил сортируем уже по названию в алфавитном порядке
                         for ink in sorted(nfo.inks, key=lambda i: i.text.lower()):
@@ -446,7 +446,7 @@ class MainWnd():
                                 hint.append('Отсутствуют данные: %s' % self.stats.get_ink_missing_data_str(ink))
 
                             bunwanted = ink.done is None
-                            self.detailstatststore.append(subitr,
+                            self.detailstats.store.append(subitr,
                                     (ink,
                                     ink.text,
                                     # avail
@@ -502,17 +502,17 @@ class MainWnd():
             self.update_recent_files_menu()
 
         finally:
-            self.detailstatsview.set_model(self.detailstatststore)
+            self.detailstats.view.set_model(self.detailstats.store)
 
             for path in expand:
-                self.detailstatsview.expand_row(path, False)
+                self.detailstats.view.expand_row(path, False)
 
             self.totalstatview.set_model(self.totalstatlstore)
 
         self.choose_random_ink()
 
     def detailstatsview_row_activated(self, tv, path, col):
-        ink = self.detailstatststore.get_value(self.detailstatststore.get_iter(path),
+        ink = self.detailstats.store.get_value(self.detailstats.store.get_iter(path),
             self.DET_COL_INK)
 
         if ink:
@@ -534,7 +534,7 @@ class MainWnd():
         else:
             inkName, inkTags, inkDescription, inkAvailability = self.stats.get_ink_description(ink)
 
-            inknamet = '<b>%s</b>' % markup_escape_text(inkName)
+            inknamet = inkName
             inktagst = markup_escape_text(inkTags) if inkTags else '-'
             inkdesct = inkDescription
             inkavailt = markup_escape_text(inkAvailability)
@@ -550,7 +550,7 @@ class MainWnd():
                 inkcolor = ColorValue.get_rgb32_value(ink.color)
                 inkcolordesc = ColorValue.new_from_rgb24(ink.color).get_description()
 
-        self.randominkname.set_markup(inknamet)
+        self.randominkname.set_text(inknamet)
         self.randominktags.set_markup(inktagst)
         self.randominkdescbuf.set_text(inkdesct)
         self.randominkavail.set_markup(inkavailt)
@@ -567,7 +567,6 @@ class MainWnd():
             self.pages.set_visible_child(self.pageChooser)
 
     def choose_random_ink(self):
-
         if self.rndchooser is not None:
             self.rndchooser.filter_inks(self.excludetags, self.includetags)
 
@@ -588,6 +587,22 @@ class MainWnd():
     def mnuRandomChoice_activate(self, wgt):
         self.choose_random_ink()
         self.pages.set_visible_child(self.pageChooser)
+
+    def mnuInkNameCopy_activate(self, wgt):
+        vc = self.pages.get_visible_child()
+        ink = None
+
+        if vc == self.pageStatistics:
+            itr = self.detailstats.get_selected_iter()
+            if itr:
+                ink = self.detailstats.store.get_value(itr,
+                    self.DET_COL_INK)
+
+        elif vc == self.pageChooser:
+            ink = self.chosenInk
+
+        if ink:
+            self.clipboard.set_text(ink.text, -1)
 
     def select_load_db(self):
         self.openorgfiledlg.set_filename(self.cfg.databaseFileName)
