@@ -1,12 +1,12 @@
 inkavail.py
+  InkNodeStatistics.get_ink_node_statistics()
+    600: возможно, придётся _везде_ приводить тэги к нижнему регистру
+
   InkNodeStatistics.__process_tagstat_directive()
-    653: присобачить проверку ошибок синтаксиса
+    721: присобачить проверку ошибок синтаксиса
 
   InkNodeStatistics.__process_tagnames_directive()
-    678: прикрутить обработку ошибок синтаксиса
-
-  __test_stats()
-    769: присобачить файл настроек с указанием файла БД
+    746: прикрутить обработку ошибок синтаксиса
 
 inkrandom.py
   __rc_main()

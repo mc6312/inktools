@@ -29,10 +29,10 @@ from colorsys import rgb_to_hls
 from collections import OrderedDict
 
 
-VERSION = '1.8.2'
+VERSION = '1.9.0'
 TITLE = 'InkTools'
 TITLE_VERSION = '%s v%s' % (TITLE, VERSION)
-COPYRIGHT = '🄯 2020,2021 MC-6312'
+COPYRIGHT = '🄯 2020, 2021 MC-6312'
 URL = 'https://github.com/mc6312/inktools'
 
 
@@ -74,15 +74,18 @@ MILLILITERS = 1000.0
 
     Пример: # @TAGNAMES dark=тёмные:black=чёрные:blue=синие:blue_black=сине-чёрные:
 
-    Дополнительно обрабатываются текстовые поля ветвей, имеющих название
-    "в наличии" - в тексте ищутся строки вида "флакон NN мл" и/или
-    "картридж".
+    Дополнительно обрабатываются текстовые поля ветвей, имеющих названия:
+    "параметры" - обрабатываются строки вида:
+                  - "цвет: #RRGGBB"
+                  - "основной цвет: метка";
+    "в наличии" - в тексте ищутся строки вида "флакон NN мл" и/или "картридж".
 """
 
 
 RX_AVAIL_ML = re.compile('^флакон\s([\d\.]+)\s?.*?$', re.UNICODE|re.IGNORECASE)
 RX_AVAIL_CR = re.compile('.*картридж.*', re.UNICODE|re.IGNORECASE)
-RX_INK_COLOR = re.compile('^цвет:\s+#([0-9,a-f]{6})$', re.UNICODE|re.IGNORECASE)
+RX_INK_COLOR = re.compile('^цвет:\s*#([0-9,a-f]{6})$', re.UNICODE|re.IGNORECASE)
+RX_INK_MAIN_COLOR = re.compile('^основной\s+цвет:\s*(.*)$', re.UNICODE|re.IGNORECASE)
 
 
 class ColorValue():
@@ -333,12 +336,31 @@ class TagStatInfo():
 
         ntags = set(inknode.tags) & self.tags
 
-        for tag in ntags:
-            if tag in self.stats:
-                nfo = self.stats[tag]
+        if ntags:
+            for tag in ntags:
+                if tag in self.stats:
+                    nfo = self.stats[tag]
+                else:
+                    nfo = self.TagStatValue()
+                    self.stats[tag] = nfo
+
+                nfo.add_ink(inknode)
+
+            return True
+
+        return False
+
+
+class MainColorStatInfo(TagStatInfo):
+    """Специальная статистика "по основному цвету"."""
+
+    def gather_statistics(self, inknode):
+        if inknode.maincolor:
+            if inknode.maincolor in self.stats:
+                nfo = self.stats[inknode.maincolor]
             else:
                 nfo = self.TagStatValue()
-                self.stats[tag] = nfo
+                self.stats[inknode.maincolor] = nfo
 
             nfo.add_ink(inknode)
 
@@ -368,6 +390,9 @@ class InkNodeStatistics():
         # где ключ - тэг, а значение - перевод названия
         self.tagNames = {}
 
+        # обратное соответствие переводов названий тэгов и тэгов
+        self.namesTags = {}
+
         # временный список экземпляров OrgHeadlineNode с неполными данными
         self.hasMissingData = []
 
@@ -375,10 +400,21 @@ class InkNodeStatistics():
         # в списки tagStats
         self.outOfStatsInks = []
 
+        # очень специальная ветка
+        maincolorStats = MainColorStatInfo(self, 'По основному цвету', '...', [])
+        ixMainColorStats = len(self.tagStats) # некоторый костылинг
+        self.tagStats.append(maincolorStats)
+
         #
-        # рекурсивный обход ветвей
+        # рекурсивный обход ветвей и заполнение вышеуказанных полей
         #
         self.scan_node(rootnode, 0)
+
+        # ...продолжение некоторого костылинга
+        if not self.tagStats[ixMainColorStats].stats:
+            # статистика пуста - выпиливаем ветвь из списка,
+            # дабы юзера не смущать
+            del self.tagStats[ixMainColorStats]
 
         # ...а теперь из hasMissingData и outOfStatsInks делаем
         # специальную ветку в tagStats
@@ -455,11 +491,12 @@ class InkNodeStatistics():
             self.outOfStatsInks)
 
     # флаги для проверки полноты описания
-    MISSING_TAGS, MISSING_DESCRIPTION, MISSING_COLOR = range(3)
+    MISSING_TAGS, MISSING_DESCRIPTION, MISSING_COLOR, MISSING_MAIN_COLOR = range(4)
 
     STR_MISSING = {MISSING_TAGS:'метки',
         MISSING_DESCRIPTION:'описание',
-        MISSING_COLOR:'цвет'}
+        MISSING_COLOR:'цвет',
+        MISSING_MAIN_COLOR:'основной цвет'}
 
     __INK_TAG = 'ink'
 
@@ -532,20 +569,51 @@ class InkNodeStatistics():
         #
         # параметры
         #
+
+        # эти значения в документе (БД) не хранятся,
+        # используются только статистикой
+
+        # образец цвета (RGB)
         node.color = None
+
+        # название основного цвета (см. ниже)
+        # используется для группировки статистики, если значение указано,
+        # иначе - используется одна из меток (как в предыдущих версиях)
+        node.maincolor = None
 
         fok, params = __get_special_text_node('параметры')
 
         for paramnode in params:
-            # цвет чернил 0xRRGGBB
-            # в документе не хранится, используется только статистикой
+            # цвет чернил #RRGGBB
             rm = RX_INK_COLOR.match(paramnode.text)
 
             if rm:
                 node.color = int(rm.group(1), 16)
 
+            # название основного цвета
+            # должно быть одним из значений цветовых тэгов (из директивы +TAGS),
+            # или одним из человекочитаемых значений (из директивы @TAGNAMES)
+            # прочие значения игнорируются
+            rm = RX_INK_MAIN_COLOR.match(paramnode.text)
+
+            if rm:
+                #TODO возможно, придётся _везде_ приводить тэги к нижнему регистру
+                cv = rm.group(1).lower()
+
+                # проверяем сначала "человекочитаемое" название тэга
+                tn = self.namesTags.get(cv)
+                if tn is None:
+                    # тогда проверяем обычный тэг
+                    if cv in self.tagNames:
+                        tn = cv
+
+                node.maincolor = tn
+
         if node.color is None:
             node.missing.add(self.MISSING_COLOR)
+
+        if node.maincolor is None:
+            node.missing.add(self.MISSING_MAIN_COLOR)
 
         #
         # наличие
@@ -681,6 +749,8 @@ class InkNodeStatistics():
 
             self.tagNames[tagname] = tagtrans
 
+        self.namesTags = OrderedDict(map(lambda r: (r[1].lower(), r[0]), self.tagNames.items()))
+
     def process_directive(self, dname, dvalue):
         """Обработка "самопальной" (не стандарта OrgMode) директивы вида
         '@ИМЯ значение'.
@@ -766,8 +836,6 @@ def get_ink_stats(db):
 
 
 def __test_stats():
-    #TODO присобачить файл настроек с указанием файла БД
-
     print('%s\n' % TITLE_VERSION)
 
     from inktoolscfg import Config
@@ -784,6 +852,20 @@ def __test_stats():
             print(tagstat.stats)
 
     return 0
+
+
+def __test_misc1():
+    print('%s\n' % TITLE_VERSION)
+
+    from inktoolscfg import Config
+
+    cfg = Config()
+    cfg.load()
+
+    stats = get_ink_stats(load_ink_db(cfg.databaseFileName))
+
+    #for node in stats.availInks:
+    #    print(stats.get_ink_description(node))
 
 
 def __test_colordesc():
@@ -807,6 +889,7 @@ def __test_colordesc():
 
 
 if __name__ == '__main__':
-    print('[testing %s]' % __file__)
-    __test_stats()
+    print('[debugging %s]' % __file__)
+    #__test_stats()
     #__test_colordesc()
+    __test_misc1()

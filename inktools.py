@@ -191,10 +191,10 @@ class MainWnd():
         #
         self.randominkname, self.randominktags, self.randominkdesc,\
         self.randominkavail, self.randominkstatus,\
-        self.randominkcolorimg, self.randominkcolordesc = get_ui_widgets(uibldr,
+        self.randominkcolorimg, self.randominkcolordesc, self.randominkmaincolor = get_ui_widgets(uibldr,
             'randominkname', 'randominktags', 'randominkdesc',
             'randominkavail', 'randominkstatus', 'randominkcolorimg',
-            'randominkcolordesc')
+            'randominkcolordesc', 'randominkmaincolor')
         self.randominkdescbuf = self.randominkdesc.get_buffer()
 
         self.includetagstxt, self.excludetagstxt, self.tagchooserdlg = get_ui_widgets(uibldr,
@@ -405,9 +405,18 @@ class MainWnd():
 
                     # мелкий костылинг: сортироваться должны только списки,
                     # полученные обработкой директив TAGSTATS
+
                     if tagstat.issortable:
-                        # первыми идут группы чернил, которых больше всего в наличии
-                        _items = sorted(_items, key=lambda r: r[1].available, reverse=True)
+                        # порядок сортировки: название метки, наличие
+                        # на кой чорт питонщики сделали key вместо cmp?
+                        # в случае cmp не пришлось бы тратить память на
+                        # значение временного ключа сортировки
+                        # и фрагментировать кучу
+                        def __group_key_f(r):
+                            return '%5d%s' % (r[1].available,
+                                              self.stats.get_tag_display_name(r[0]).lower())
+
+                        _items = sorted(_items, key=__group_key_f, reverse=True)
 
                     for tag, nfo in _items:
                         row = (None, self.stats.get_tag_display_name(tag),
@@ -524,8 +533,9 @@ class MainWnd():
         inkdesct = ''
         inkavailt = '-'
         inkstatust = '-'
-        inkcolordesc = '' # тут когда-нибудь будет человекочитаемое описание цвета
+        inkcolordesc = '-' # тут когда-нибудь будет человекочитаемое описание цвета
         inkcolor = None
+        inkmaincolor = '-'
 
         self.chosenInk = ink
 
@@ -550,12 +560,16 @@ class MainWnd():
                 inkcolor = ColorValue.get_rgb32_value(ink.color)
                 inkcolordesc = ColorValue.new_from_rgb24(ink.color).get_description()
 
+            if ink.maincolor:
+                inkmaincolor = self.stats.tagNames.get(ink.maincolor, ink.maincolor)
+
         self.randominkname.set_text(inknamet)
         self.randominktags.set_markup(inktagst)
         self.randominkdescbuf.set_text(inkdesct)
         self.randominkavail.set_markup(inkavailt)
         self.randominkstatus.set_text(inkstatust)
         self.randominkcolordesc.set_text(inkcolordesc)
+        self.randominkmaincolor.set_text(inkmaincolor)
 
         if inkcolor is None:
             self.randominkcolorimg.set_from_pixbuf(self.nocoloricon)
