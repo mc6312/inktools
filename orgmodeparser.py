@@ -3,7 +3,7 @@
 
 """ orgmodeparser.py
 
-    Copyright 2020 MC-6312 <mc6312@gmail.com>
+    Copyright 2020-2021 MC-6312 (http://github.com/mc6312)
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -27,7 +27,7 @@ import os.path
 import re
 
 
-VERSION = '0.8'
+VERSION = '0.9'
 
 
 class OrgNode():
@@ -86,8 +86,34 @@ class OrgNode():
 
             return child
 
+    def find_children_by_text(self, text, childtype):
+        """Ищет в списке children дочерние элементы, поля text которых
+        равны параметру text, и возвращает список найденных экземпляров
+        OrgNode.
+        Сравнение регистро-независимое, поиск НЕ рекурсивный.
+        Если параметр childtype не None, проверяются
+        также типы дочерних элементов на совпадение с childtype.
+        Если метод ничего не находит - возвращает пустой список."""
+
+        text = text.lower()
+
+        found = []
+
+        for child in self.children:
+            # НЕ isinstance(child, childtype) потому, что нужно
+            # точное сравнение, а не совпадение класса-потомка с родителем
+            if childtype is not None and type(child) is not childtype:
+                continue
+
+            if child.text.lower() != text:
+                continue
+
+            found.append(child)
+
+        return found
+
     def __repr_children__(self):
-        return 'children=[...%d item(s)...]' % len(self.children)
+        return 'children=[%d item(s)]' % len(self.children)
 
     def __repr_values__(self):
         # потомок, имеющий дополнительные поля, должен возвращать словарь
@@ -99,10 +125,12 @@ class OrgNode():
         if self.text is not None:
             vd['text'] = self.text
 
-        return '%s(%s%s)' % (
+        ta = list(map(lambda a: '%s="%s"' % (a[0], a[1]), vd.items()))
+        ta.append(self.__repr_children__())
+
+        return '%s(%s)' % (
             self.__class__.__name__,
-            '' if not vd else ', '.join(map(lambda a: '%s="%s"' % (a[0], a[1]), vd.items())),
-            self.__repr_children__())
+            ', '.join(ta))
 
     def __str__(self):
         """Класс-потомок должен полностью перекрывать этот метод, если

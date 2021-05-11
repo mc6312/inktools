@@ -3,7 +3,7 @@
 
 """ inktools.py
 
-    Copyright 2020 MC-6312 <mc6312@gmail.com>
+    Copyright 2020-2021 MC-6312 (http://github.com/mc6312)
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -196,6 +196,11 @@ class MainWnd():
             'randominkavail', 'randominkstatus', 'randominkcolorimg',
             'randominkcolordesc', 'randominkmaincolor')
         self.randominkdescbuf = self.randominkdesc.get_buffer()
+
+        uibldr.get_object('randominkusagesw').set_size_request(-1, WIDGET_BASE_HEIGHT * 6)
+
+        self.randominkusageview = TreeViewShell.new_from_uibuilder(uibldr, 'randominkusagetv')
+        self.randominkusageview.sortColumn = 0
 
         self.includetagstxt, self.excludetagstxt, self.tagchooserdlg = get_ui_widgets(uibldr,
             'includetagstxt', 'excludetagstxt', 'tagchooserdlg')
@@ -539,6 +544,8 @@ class MainWnd():
 
         self.chosenInk = ink
 
+        self.randominkusageview.refresh_begin()
+
         if not ink:
             inknamet = 'ничего подходящего не нашлось'
         else:
@@ -562,6 +569,17 @@ class MainWnd():
 
             if ink.maincolor:
                 inkmaincolor = self.stats.tagNames.get(ink.maincolor, ink.maincolor)
+
+            dnow = datetime.datetime.now().date()
+
+            for unfo in ink.usage:
+                _dd = dnow - unfo.date
+
+                self.randominkusageview.store.append((str(unfo.date),
+                    'сегодня' if _dd.days <= 1 else '%d дн. назад' % _dd.days,
+                    unfo.comment))
+
+        self.randominkusageview.refresh_end()
 
         self.randominkname.set_text(inknamet)
         self.randominktags.set_markup(inktagst)

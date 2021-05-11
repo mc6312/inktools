@@ -24,12 +24,13 @@ import os.path
 import sys
 from orgmodeparser import *
 import re
+import datetime
 from math import sqrt
 from colorsys import rgb_to_hls
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 
 
-VERSION = '1.9.0'
+VERSION = '1.9.1'
 TITLE = 'InkTools'
 TITLE_VERSION = '%s v%s' % (TITLE, VERSION)
 COPYRIGHT = '🄯 2020, 2021 MC-6312'
@@ -76,9 +77,12 @@ MILLILITERS = 1000.0
 
     Дополнительно обрабатываются текстовые поля ветвей, имеющих названия:
     "параметры" - обрабатываются строки вида:
-                  - "цвет: #RRGGBB"
-                  - "основной цвет: метка";
-    "в наличии" - в тексте ищутся строки вида "флакон NN мл" и/или "картридж".
+                - "цвет: #RRGGBB"
+                - "основной цвет: метка";
+    "наличие" или "в наличии" - в тексте ищутся строки вида:
+                - "флакон NN мл" и/или "картридж";
+    "использование" или "заправки" - в тексте ищутся строки вида
+    "дата[:примечания]".
 """
 
 
@@ -242,8 +246,10 @@ class ColorValue():
             return
 
 
-class TagStatInfo():
-    class TagStatValue():
+class StatInfo():
+    """Базовый класс для отображаемой статистики"""
+
+    class StatValue():
         __slots__ = 'available', 'unavailable', 'wanted', 'unwanted', 'inks'
 
         def __init__(self):
@@ -285,6 +291,46 @@ class TagStatInfo():
 
             self.inks.append(inknode)
 
+    def __init__(self, totals, title, col1title):
+        """Параметры:
+        totals      - экземпляр класса InkNodeStatistics,
+                      которому принадлежит текущий экземпляр TagStatInfo;
+        title       - название статистической таблицы;
+        col1title   - название первого столбца."""
+
+        self.totalstats = totals
+        self.title = title
+        self.col1title = col1title
+
+        # ключ - текст для первого столбца, значение - экземпляр StatValue
+        self.stats = OrderedDict()
+
+        # флаг для UI: если True, элементы stats при отображении
+        # должны быть отсортированы; как именно - на совести UI
+        self.issortable = True
+
+    def __repr__(self):
+        return '%s(title="%s", col1title="%s", stats=%s)' % (self.__class__.__name__,
+            self.title, self.col1title, self.stats)
+
+    def add_special_value(self, name, inks):
+        """Создание и добавление в self.stats специального экземпляра
+        StatValue.
+
+        name    - строка, имя псевдометки;
+        inks    - список экземпляров OrgHeadlineNode."""
+
+        nfo = self.StatValue()
+
+        for ink in inks:
+            nfo.add_ink(ink)
+
+        self.stats[name] = nfo
+
+
+class TagStatInfo(StatInfo):
+    """Класс для отображаемой статистики по меткам"""
+
     def __init__(self, totals, title, col1title, tags):
         """Параметры:
         totals      - экземпляр класса InkNodeStatistics,
@@ -293,37 +339,14 @@ class TagStatInfo():
         col1title   - название первого столбца;
         tags        - список меток, которые следует учитывать"""
 
-        self.totalstats = totals
-        self.title = title
-        self.col1title = col1title
+        super().__init__(totals, title, col1title)
 
         # все метки, которые учитываем
         self.tags = set(tags)
 
-        # ключ - метка, значение - экземпляр TagStatValue
-        self.stats = OrderedDict()
-
-        # флаг для UI: если True, элементы stats при отображении
-        # должны быть отсортированы; как именно - на совести UI
-        self.issortable = True
-
     def __repr__(self):
         return '%s(title="%s", col1title="%s", tags=%s, stats=%s)' % (self.__class__.__name__,
             self.title, self.col1title, self.tags, self.stats)
-
-    def add_special_value(self, name, inks):
-        """Создание и добавление в self.stats специального экземпляра
-        TagStatValue.
-
-        name    - строка, имя псевдометки;
-        inks    - список экземпляров OrgHeadlineNode."""
-
-        nfo = self.TagStatValue()
-
-        for ink in inks:
-            nfo.add_ink(ink)
-
-        self.stats[name] = nfo
 
     def gather_statistics(self, inknode):
         """Учёт чернил в статистике, если у них есть метки, совпадающие
@@ -341,7 +364,7 @@ class TagStatInfo():
                 if tag in self.stats:
                     nfo = self.stats[tag]
                 else:
-                    nfo = self.TagStatValue()
+                    nfo = self.StatValue()
                     self.stats[tag] = nfo
 
                 nfo.add_ink(inknode)
@@ -359,7 +382,7 @@ class MainColorStatInfo(TagStatInfo):
             if inknode.maincolor in self.stats:
                 nfo = self.stats[inknode.maincolor]
             else:
-                nfo = self.TagStatValue()
+                nfo = self.StatValue()
                 self.stats[inknode.maincolor] = nfo
 
             nfo.add_ink(inknode)
@@ -400,6 +423,20 @@ class InkNodeStatistics():
         # в списки tagStats
         self.outOfStatsInks = []
 
+        #
+        # статистика популярности чернил
+        #
+
+        self.nowDate = datetime.datetime.now().date()
+
+        # словарь, где ключи - кол-во дней с последнего использования
+        # чернил, а значения - множества (set) соотв. чернил
+        self.inksByDaysSLU = dict()
+
+        # словарь, где ключи - количество "использований" (напр. заправок)
+        # чернил, а значения - множества (set) соотв. чернил
+        self.inksByUsage = dict()
+
         # очень специальная ветка
         maincolorStats = MainColorStatInfo(self, 'По основному цвету', '...', [])
         ixMainColorStats = len(self.tagStats) # некоторый костылинг
@@ -415,6 +452,11 @@ class InkNodeStatistics():
             # статистика пуста - выпиливаем ветвь из списка,
             # дабы юзера не смущать
             del self.tagStats[ixMainColorStats]
+
+        #
+        # делаем ветки из словарей со счётчиками использования
+        #
+
 
         # ...а теперь из hasMissingData и outOfStatsInks делаем
         # специальную ветку в tagStats
@@ -500,6 +542,8 @@ class InkNodeStatistics():
 
     __INK_TAG = 'ink'
 
+    usageinfo = namedtuple('usageinfo', 'date comment')
+
     def get_ink_node_statistics(self, node):
         """Сбор статистики для node, если это OrgHeadlineNode с описание
         чернил.
@@ -542,7 +586,7 @@ class InkNodeStatistics():
         # обрабатываем специальные подветви
         #
 
-        def __get_special_text_node(headname):
+        def __get_special_text_node(*headname):
             """Ищет ветвь типа OrgHeadlineNode с текстом заголовка headname,
             нерекурсивно ищет в ней вложенные ветви типа OrgTextNode.
             Возвращает кортеж из двух элементов:
@@ -551,18 +595,22 @@ class InkNodeStatistics():
             иначе список будет пуст."""
 
             retl = []
+            fok = False
 
-            hlnode = node.find_child_by_text(headname, OrgHeadlineNode)
+            hlnode = None
 
-            if hlnode:
-                fok = True
+            # внимание! ищем первый попавшийся вариант названия, но не все!
+            for hn in headname:
+                hlnode = node.find_child_by_text(hn, OrgHeadlineNode)
+                if hlnode:
+                    fok = True
 
-                for child in hlnode.children:
-                    # isinstance тут не годится
-                    if type(child) is OrgTextNode:
-                        retl.append(child)
-            else:
-                fok = False
+                    for child in hlnode.children:
+                        # isinstance тут не годится
+                        if type(child) is OrgTextNode:
+                            retl.append(child)
+
+                    break
 
             return (fok, retl)
 
@@ -616,15 +664,88 @@ class InkNodeStatistics():
             node.missing.add(self.MISSING_MAIN_COLOR)
 
         #
+        # статистика использования
+        #
+
+        def __parse_date(ds):
+            """Разбирает строку ds, содержащую дату, возвращает
+            экземпляр datetime.date.
+            Если строка не соответствует допустимым вариантам формата
+            или содержит значения вне допустимого диапазона, возвращает
+            None.)"""
+
+            da = ds.split('.', 2)
+            if len(da) != 3:
+                da = da.split('-', 2)
+
+            if len(da) != 3:
+                return
+
+            lda = tuple(map(len, da))
+
+            if lda != (4,2,2) and lda != (2,2,4):
+                return
+
+            try:
+                da = tuple(map(int, da))
+
+                if lda[0] == 4:
+                    return datetime.date(da[0], da[1], da[2])
+                else:
+                    return datetime.date(da[2], da[1], da[0])
+
+            except ValueError:
+                return
+
+        # список node.usage в документе не хранится, используется только статистикой
+        # список содержит экземпляры usageinfo
+        node.usage = []
+
+        # кол-во дней с последнего использования чернил, если в файле есть соотв. данные
+        node.daysSLU = None
+
+        fok, usage = __get_special_text_node('использование', 'заправки')
+        if fok:
+            for ustr in usage:
+                udate, _, ucmt = ustr.text.partition(':')
+
+                udate = __parse_date(udate)
+                if not udate:
+                    continue
+
+                dslu = (self.nowDate - udate).days
+                if node.daysSLU is None or node.daysSLU > dslu:
+                    node.daysSLU = dslu
+
+                node.usage.append(self.usageinfo(udate, ucmt.strip()))
+
+        # пихаем чернила в общую статистику по датам
+        if node.daysSLU is not None:
+            if node.daysSLU in self.inksByDaysSLU:
+                self.inksByDaysSLU[node.daysSLU].add(node)
+            else:
+                self.inksByDaysSLU[node.daysSLU] = set([node])
+
+        # пихаем чернила в общую статистику по используемости
+        nusage = len(node.usage)
+        if nusage > 0:
+            if nusage in self.inksByUsage:
+                self.inksByUsage[nusage].add(node)
+            else:
+                self.inksByUsage[nusage] = set([node])
+
+        #
         # наличие
         #
 
-        # в документе не хранится - используется только статистикой
+        # поля avail/availMl/availCartridges в документе не хранятся
+        # - используется только статистикой
+        # для загрузки их значений производится разбор текста соотв. ветви файла
         node.avail = False
         node.availMl = 0.0
         node.availCartridges = False
 
-        fok, avails = __get_special_text_node('в наличии')
+        fok, avails = __get_special_text_node('в наличии', 'наличие')
 
         for availnode in avails:
             rm = RX_AVAIL_ML.match(availnode.text)
@@ -820,11 +941,11 @@ class InkNodeStatistics():
 
 def load_ink_db(fname):
     if not fname:
-        print('Файл не указан')
+        print('Файл не указан', file=sys.stderr)
         return None
 
     if not os.path.exists(fname):
-        print('Файл "%s" не найден' % fname)
+        print('Файл "%s" не найден' % fname, file=sys.stderr)
         return None
 
     #print(f'Загружаю {fname}')
@@ -843,6 +964,12 @@ def __test_stats():
     cfg = Config()
     cfg.load()
 
+    def __print_stat_dict(d, what, r):
+        print('\n%s' % what)
+
+        for v, inks in sorted(d.items(), reverse=r):
+            print('%4d' % v, ', '.join(map(lambda i: i.text, inks)))
+
     stats = get_ink_stats(load_ink_db(cfg.databaseFileName))
     if stats:
         print(stats.get_total_result_table())
@@ -850,6 +977,9 @@ def __test_stats():
         for tagstat in stats.tagStats:
             print('\n%s' % tagstat.title)
             print(tagstat.stats)
+
+        __print_stat_dict(stats.inksByDaysSLU, 'По дате использования', False)
+        __print_stat_dict(stats.inksByUsage, 'По частоте использования', True)
 
     return 0
 
@@ -890,6 +1020,6 @@ def __test_colordesc():
 
 if __name__ == '__main__':
     print('[debugging %s]' % __file__)
-    #__test_stats()
+    __test_stats()
     #__test_colordesc()
-    __test_misc1()
+    #__test_misc1()

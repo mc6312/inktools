@@ -5,7 +5,7 @@
 
     Набор обвязок и костылей к GTK, общий для типовых гуёв.
 
-    Copyright 2018-2020 MC-6312 (http://github.com/mc6312)
+    Copyright 2018-2021 MC-6312 (http://github.com/mc6312)
 
     This module is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -36,7 +36,7 @@ from sys import stderr, argv
 import os.path
 
 
-REVISION = 2020113000
+REVISION = 2021042400
 
 
 def get_widget_base_units():
@@ -486,23 +486,143 @@ class TreeViewShell():
     """Обёртка для упрощения дёргания Gtk.TreeView"""
 
     def __init__(self, tv):
-        """tv   - экземпляр Gtk.TreeView."""
+        """Параметры:
+            tv      - экземпляр Gtk.TreeView.
+
+        Поля:
+            view        - экземпляр Gtk.TreeView;
+            store       - экземпляр потомка Gtk.TreeModel;
+            selection   - экземпляр Gtk.TreeSelection;
+            widget      - экземпляр потомка Gtk.Widget,
+                          который следует помещать в контейнер
+                          при полностью динамическом создании UI.
+            Внимание! Назначение прочих заданных в конструкторе полей
+            может быть изменено в следующих версиях модуля."""
 
         self.view = tv
         self.store = tv.get_model()
         self.selection = tv.get_selection()
 
-        # см. метод select_iter
-        self.expandSelectedRow = False
-        self.expandSelectedAll = False
+        self.widget = tv
 
         self.sortOrder = Gtk.SortType.ASCENDING
         self.sortColumn = -1
+
+    class Cell():
+        """Класс-хранилище параметров для создания Gtk.CellRenderer*"""
+
+        def __init__(self, index, editable=False, expand=False, align=0.0, markup=False):
+            """Параметры:
+            index       - номер столбца в List|TreeStore,
+            editable    - (булевское) запрет/разрешение редактирования ячейки,
+            expand      - (булевское) фиксированная/автоматическая ширина,
+            align       - (0.0..1.0) выравнивание содержимого ячейки,
+            markup      - (булевское) для столбцов типа GObject.TYPE_STRING:
+                          True - использовать Pango Markup при отображении столбца,
+                          False - отображать как простой текст."""
+
+            self.index = index
+            self.editable = editable
+            self.expand = expand
+            self.align = align
+            self.markup = markup
+
+    class Column():
+        """Класс-хранилище параметров для создания Gtk.TreeViewColumn."""
+
+        def __init__(self, cells, title='', expand=False, tooltip=None):
+            """Параметры:
+            cells       - список или кортеж из как минимум одного экземпляра Cell,
+            title       - отображаемое в заголовке название,
+            expand      - (булевское) фиксированная/автоматическая ширина,
+            tooltip     - если не None, то целое - индекс столбца в *Store,
+                          который должен использоваться для отображения
+                          tooltips (всплывающих подсказок);
+                          если None - для подсказки будет использован
+                          столбец index первого элемента cells."""
+
+            self.cells = cells
+            self.title = title
+            self.expand = expand
+            self.tooltip = tooltip if tooltip is not None else cells[0].index
 
     @classmethod
     def new(cls, tv):
         # сей метод - для единообразия
         return cls(tv)
+
+    @classmethod
+    def new_view(cls, coltypes, colparams, islist=True, withscroll=False):
+        """Создаёт Gtk.TreeView, Gtk.ListStore|TreeStore и т.п. динамически.
+        coltypes    - список или кортеж типов значений для Gtk.ListStore;
+        cols        - список или кортеж параметров столбцов, где элементы -
+                      экземпляры TreeViewer.Column;
+        withscroll  - булевское значение, True, если нужно создать
+                      экземпляр Gtk.ScrolledWindow и поместить
+                      TreeView туда."""
+
+        store = (Gtk.ListStore if islist else Gtk.TreeStore)(*coltypes)
+        tv = Gtk.TreeView.new_with_model(store)
+
+        tvsh = cls(tv)
+
+        if withscroll:
+            tvsh.scroll = Gtk.ScrolledWindow()
+            tvsh.scroll.add(tv)
+
+            tvsh.scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+            tvsh.scroll.set_overlay_scrolling(False)
+            tvsh.scroll.set_shadow_type(Gtk.ShadowType.IN)
+
+            tvsh.widget = tvsh.scroll
+
+        ncols = len(coltypes)
+
+        for colparam in colparams:
+            col = Gtk.TreeViewColumn.new()
+            #self.columns.append(col)
+
+            for cix, cell in enumerate(colparam.cells, 1):
+                if cell.index < 0 or cell.index >= ncols:
+                    raise IndexError('%s.new_list(): Cell.index out of range' % cls.__class__.__name__)
+
+                ctype = coltypes[cell.index]
+
+                if ctype == GObject.TYPE_BOOLEAN:
+                    crt = Gtk.CellRendererToggle()
+                    crtpar = 'active'
+                elif ctype == GObject.TYPE_STRING:
+                    crt = Gtk.CellRendererText() #!!!
+                    crt.props.xalign = cell.align
+
+                    if cell.expand:
+                        crt.props.ellipsize = Pango.EllipsizeMode.END
+                    else:
+                        crt.props.ellipsize = Pango.EllipsizeMode.NONE
+
+                    crt.props.editable = cell.editable
+                    crtpar = 'text' if not cell.markup else 'markup'
+                elif ctype == Pixbuf:
+                    crt = Gtk.CellRendererPixbuf()
+                    crt.props.xalign = cell.align
+                    crtpar = 'pixbuf'
+                else:
+                    raise ValueError('%s.new_list(): unsupported Gtk.%s column #%d data type' % (
+                                     cls.__class__.__name__,
+                                     store.__class__.__name__,
+                                     cix))
+
+                col.pack_start(crt, cell.expand)
+                col.add_attribute(crt, crtpar, cell.index)
+
+            tvsh.view.append_column(col)
+            col.set_title(colparam.title)
+            col.set_sizing(Gtk.TreeViewColumnSizing.GROW_ONLY)
+            col.set_resizable(colparam.expand)
+            col.set_expand(colparam.expand)
+            #tvsh.colmap[col] = colparam.tooltip
+
+        return tvsh
 
     @classmethod
     def new_from_uibuilder(cls, builder, widgetname):
@@ -531,6 +651,29 @@ class TreeViewShell():
             if rows:
                 return self.store.get_iter(rows[0])
 
+    def find_iter(self, col, v, fromIter=None):
+        """Рекурсивный поиск положения в Gtk.TreeModel.
+
+        col         - номер столбца в TreeModel,
+        v           - значение столбца, которое следует найти,
+        fromIter    - None или Gtk.TreeIter:
+                      начальное положение в TreeModel;
+                      в случае None поиск идёт с первого элемента TreeModel.
+
+        Возвращает Gtk.TreeIter для первого найденного значения,
+        или None, если ничего не находит."""
+
+        itr = self.store.iter_children(fromIter)
+        while itr:
+            if v == self.store.get_value(itr, col):
+                return itr
+
+            subitr = self.find_iter(col, v, itr)
+            if subitr:
+                return subitr
+
+            itr = self.store.iter_next(itr)
+
     def select_iter(self, itr, col=None, edit=False):
         """Выбирает указанный элемент в дереве, указанный itr (экземпляром
         Gtk.TreeIter), при необходимости заставляет TreeView развернуть
@@ -544,8 +687,9 @@ class TreeViewShell():
 
         path = self.store.get_path(itr)
 
-        if self.expandSelectedRow:
-            self.view.expand_row(path, self.expandSelectedAll)
+        # иначе для неразвёрнутых ветвей строка вообще не будет подсвечена
+        # странная особенность поведения TreeView
+        self.view.expand_to_path(path)
 
         self.selection.select_path(path)
         self.view.set_cursor(path, col, edit)
@@ -586,10 +730,18 @@ def __debug_load_icon():
 
     print(pbuf)
 
+def __debug_treeviewshell():
+    tvsh = TreeViewShell.new_view(
+        (GObject.TYPE_STRING, GObject.TYPE_STRING, GObject.TYPE_STRING,),
+        (TreeViewShell.Column((TreeViewShell.Cell(0),), 'moo'),
+         TreeViewShell.Column((TreeViewShell.Cell(1),
+            TreeViewShell.Cell(2)), 'foo')))
+
 
 if __name__ == '__main__':
     print('[debugging %s]' % __file__)
 
     #__debug_msgdlg()
-    __debug_load_icon()
+    #__debug_load_icon()
+    __debug_treeviewshell()
 
