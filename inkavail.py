@@ -30,7 +30,7 @@ from colorsys import rgb_to_hls
 from collections import OrderedDict, namedtuple
 
 
-VERSION = '1.9.1'
+VERSION = '1.10.0'
 TITLE = 'InkTools'
 TITLE_VERSION = '%s v%s' % (TITLE, VERSION)
 COPYRIGHT = '🄯 2020, 2021 MC-6312'
@@ -246,8 +246,8 @@ class ColorValue():
             return
 
 
-class StatInfo():
-    """Базовый класс для отображаемой статистики"""
+class TagStatInfo():
+    """Класс для отображаемой статистики по меткам"""
 
     class StatValue():
         __slots__ = 'available', 'unavailable', 'wanted', 'unwanted', 'inks'
@@ -291,12 +291,13 @@ class StatInfo():
 
             self.inks.append(inknode)
 
-    def __init__(self, totals, title, col1title):
+    def __init__(self, totals, title, col1title, tags):
         """Параметры:
         totals      - экземпляр класса InkNodeStatistics,
                       которому принадлежит текущий экземпляр TagStatInfo;
         title       - название статистической таблицы;
-        col1title   - название первого столбца."""
+        col1title   - название первого столбца;
+        tags        - список меток, которые следует учитывать"""
 
         self.totalstats = totals
         self.title = title
@@ -309,9 +310,12 @@ class StatInfo():
         # должны быть отсортированы; как именно - на совести UI
         self.issortable = True
 
+        # все метки, которые учитываем
+        self.tags = set(tags)
+
     def __repr__(self):
-        return '%s(title="%s", col1title="%s", stats=%s)' % (self.__class__.__name__,
-            self.title, self.col1title, self.stats)
+        return '%s(title="%s", col1title="%s", tags=%s, stats=%s)' % (self.__class__.__name__,
+            self.title, self.col1title, self.tags, self.stats)
 
     def add_special_value(self, name, inks):
         """Создание и добавление в self.stats специального экземпляра
@@ -320,33 +324,14 @@ class StatInfo():
         name    - строка, имя псевдометки;
         inks    - список экземпляров OrgHeadlineNode."""
 
-        nfo = self.StatValue()
+        if name not in self.stats:
+            nfo = self.StatValue()
+            self.stats[name] = nfo
+        else:
+            nfo = self.stats[name]
 
         for ink in inks:
             nfo.add_ink(ink)
-
-        self.stats[name] = nfo
-
-
-class TagStatInfo(StatInfo):
-    """Класс для отображаемой статистики по меткам"""
-
-    def __init__(self, totals, title, col1title, tags):
-        """Параметры:
-        totals      - экземпляр класса InkNodeStatistics,
-                      которому принадлежит текущий экземпляр TagStatInfo;
-        title       - название статистической таблицы;
-        col1title   - название первого столбца;
-        tags        - список меток, которые следует учитывать"""
-
-        super().__init__(totals, title, col1title)
-
-        # все метки, которые учитываем
-        self.tags = set(tags)
-
-    def __repr__(self):
-        return '%s(title="%s", col1title="%s", tags=%s, stats=%s)' % (self.__class__.__name__,
-            self.title, self.col1title, self.tags, self.stats)
 
     def gather_statistics(self, inknode):
         """Учёт чернил в статистике, если у них есть метки, совпадающие
@@ -429,13 +414,14 @@ class InkNodeStatistics():
 
         self.nowDate = datetime.datetime.now().date()
 
-        # словарь, где ключи - кол-во дней с последнего использования
-        # чернил, а значения - множества (set) соотв. чернил
-        self.inksByDaysSLU = dict()
+        # статистика по кол-ву дней с последнего использования
+        #TODO вместо использования в качестве ключей всех значений "дней" сделать группировку по диапазонам
+        self.inksByDaysSLU = TagStatInfo(self, 'Последнее использование', 'Дней', [])
 
-        # словарь, где ключи - количество "использований" (напр. заправок)
+        # статистика по количеству "использований" (напр. заправок)
         # чернил, а значения - множества (set) соотв. чернил
-        self.inksByUsage = dict()
+        #TODO вместо использования в качестве ключей всех значений кол-ва заправок сделать группировку по диапазонам
+        self.inksByUsage = TagStatInfo(self, 'Количество заправок', 'Кол-во', [])
 
         # очень специальная ветка
         maincolorStats = MainColorStatInfo(self, 'По основному цвету', '...', [])
@@ -454,9 +440,10 @@ class InkNodeStatistics():
             del self.tagStats[ixMainColorStats]
 
         #
-        # делаем ветки из словарей со счётчиками использования
+        # статистика популярности чернил
         #
-
+        self.tagStats.append(self.inksByDaysSLU)
+        self.tagStats.append(self.inksByUsage)
 
         # ...а теперь из hasMissingData и outOfStatsInks делаем
         # специальную ветку в tagStats
@@ -719,21 +706,6 @@ class InkNodeStatistics():
 
                 node.usage.append(self.usageinfo(udate, ucmt.strip()))
 
-        # пихаем чернила в общую статистику по датам
-        if node.daysSLU is not None:
-            if node.daysSLU in self.inksByDaysSLU:
-                self.inksByDaysSLU[node.daysSLU].add(node)
-            else:
-                self.inksByDaysSLU[node.daysSLU] = set([node])
-
-        # пихаем чернила в общую статистику по используемости
-        nusage = len(node.usage)
-        if nusage > 0:
-            if nusage in self.inksByUsage:
-                self.inksByUsage[nusage].add(node)
-            else:
-                self.inksByUsage[nusage] = set([node])
-
         #
         # наличие
         #
@@ -782,6 +754,43 @@ class InkNodeStatistics():
         #
         if node.missing:
             self.hasMissingData.append(node)
+
+        #
+        # пихаем чернила в общую статистику по датам
+        #
+
+        if node.daysSLU is None:
+            ns = 'никогда'
+        elif node.daysSLU < 7:
+            ns = '%d дн.' % node.daysSLU
+        elif node.daysSLU < 31:
+            ns = 'больше недели'
+        elif node.daysSLU < 182:
+            ns = 'больше месяца'
+        elif node.daysSLU < 365:
+            ns = 'больше полугода'
+        else:
+            ns = 'больше года'
+
+        self.inksByDaysSLU.add_special_value(ns, [node])
+
+        #
+        # пихаем чернила в общую статистику по используемости
+        #
+        #TODO: возможно, добавить диапазоны больше 10 заправок
+
+        nusage = len(node.usage)
+        if nusage > 0:
+            if nusage == 1:
+                ns = '1 раз'
+            elif nusage < 6:
+                ns = '2-5 раз'
+            elif nusage < 11:
+                ns = '6-10 раз'
+            else:
+                ns = 'больше 10 раз'
+
+            self.inksByUsage.add_special_value(ns, [node])
 
         #
         # скармливаем всё, что следует, статистике "по тэгам"
@@ -964,12 +973,6 @@ def __test_stats():
     cfg = Config()
     cfg.load()
 
-    def __print_stat_dict(d, what, r):
-        print('\n%s' % what)
-
-        for v, inks in sorted(d.items(), reverse=r):
-            print('%4d' % v, ', '.join(map(lambda i: i.text, inks)))
-
     stats = get_ink_stats(load_ink_db(cfg.databaseFileName))
     if stats:
         print(stats.get_total_result_table())
@@ -977,9 +980,6 @@ def __test_stats():
         for tagstat in stats.tagStats:
             print('\n%s' % tagstat.title)
             print(tagstat.stats)
-
-        __print_stat_dict(stats.inksByDaysSLU, 'По дате использования', False)
-        __print_stat_dict(stats.inksByUsage, 'По частоте использования', True)
 
     return 0
 

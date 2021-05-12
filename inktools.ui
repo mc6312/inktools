@@ -603,52 +603,77 @@
                       </packing>
                     </child>
                     <child>
-                      <object class="GtkScrolledWindow" id="randominkusagesw">
+                      <object class="GtkBox">
                         <property name="visible">True</property>
-                        <property name="can-focus">True</property>
+                        <property name="can-focus">False</property>
                         <property name="hexpand">True</property>
-                        <property name="hscrollbar-policy">never</property>
+                        <property name="vexpand">False</property>
+                        <property name="orientation">vertical</property>
+                        <property name="spacing">4</property>
                         <child>
-                          <object class="GtkTreeView" id="randominkusagetv">
+                          <object class="GtkLabel" id="randominkusagecnt">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label" translatable="yes">...</property>
+                            <property name="xalign">0</property>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">0</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkScrolledWindow" id="randominkusagesw">
                             <property name="visible">True</property>
                             <property name="can-focus">True</property>
-                            <property name="model">randominkusagelstore</property>
-                            <property name="headers-visible">False</property>
-                            <property name="show-expanders">False</property>
-                            <child internal-child="selection">
-                              <object class="GtkTreeSelection"/>
-                            </child>
+                            <property name="hexpand">True</property>
+                            <property name="hscrollbar-policy">never</property>
                             <child>
-                              <object class="GtkTreeViewColumn" id="colUDate">
+                              <object class="GtkTreeView" id="randominkusagetv">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="model">randominkusagelstore</property>
+                                <property name="headers-visible">False</property>
+                                <property name="show-expanders">False</property>
                                 <child>
-                                  <object class="GtkCellRendererText" id="crUDate"/>
-                                  <attributes>
-                                    <attribute name="text">0</attribute>
-                                  </attributes>
+                                  <object class="GtkTreeViewColumn" id="colUDate">
+                                    <child>
+                                      <object class="GtkCellRendererText" id="crUDate"/>
+                                      <attributes>
+                                        <attribute name="text">0</attribute>
+                                      </attributes>
+                                    </child>
+                                  </object>
                                 </child>
-                              </object>
-                            </child>
-                            <child>
-                              <object class="GtkTreeViewColumn" id="colUDaysAgo">
                                 <child>
-                                  <object class="GtkCellRendererText" id="crUDaysAgo"/>
-                                  <attributes>
-                                    <attribute name="text">1</attribute>
-                                  </attributes>
+                                  <object class="GtkTreeViewColumn" id="colUDaysAgo">
+                                    <child>
+                                      <object class="GtkCellRendererText" id="crUDaysAgo"/>
+                                      <attributes>
+                                        <attribute name="text">1</attribute>
+                                      </attributes>
+                                    </child>
+                                  </object>
                                 </child>
-                              </object>
-                            </child>
-                            <child>
-                              <object class="GtkTreeViewColumn" id="colUComment">
                                 <child>
-                                  <object class="GtkCellRendererText" id="crUComment"/>
-                                  <attributes>
-                                    <attribute name="text">2</attribute>
-                                  </attributes>
+                                  <object class="GtkTreeViewColumn" id="colUComment">
+                                    <child>
+                                      <object class="GtkCellRendererText" id="crUComment"/>
+                                      <attributes>
+                                        <attribute name="text">2</attribute>
+                                      </attributes>
+                                    </child>
+                                  </object>
                                 </child>
                               </object>
                             </child>
                           </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">1</property>
+                          </packing>
                         </child>
                       </object>
                       <packing>

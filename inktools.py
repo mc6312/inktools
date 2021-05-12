@@ -191,10 +191,11 @@ class MainWnd():
         #
         self.randominkname, self.randominktags, self.randominkdesc,\
         self.randominkavail, self.randominkstatus,\
-        self.randominkcolorimg, self.randominkcolordesc, self.randominkmaincolor = get_ui_widgets(uibldr,
+        self.randominkcolorimg, self.randominkcolordesc, self.randominkmaincolor,\
+        self.randominkusagecnt = get_ui_widgets(uibldr,
             'randominkname', 'randominktags', 'randominkdesc',
             'randominkavail', 'randominkstatus', 'randominkcolorimg',
-            'randominkcolordesc', 'randominkmaincolor')
+            'randominkcolordesc', 'randominkmaincolor', 'randominkusagecnt')
         self.randominkdescbuf = self.randominkdesc.get_buffer()
 
         uibldr.get_object('randominkusagesw').set_size_request(-1, WIDGET_BASE_HEIGHT * 6)
@@ -541,6 +542,7 @@ class MainWnd():
         inkcolordesc = '-' # тут когда-нибудь будет человекочитаемое описание цвета
         inkcolor = None
         inkmaincolor = '-'
+        inkusagecnt = '...'
 
         self.chosenInk = ink
 
@@ -572,6 +574,8 @@ class MainWnd():
 
             dnow = datetime.datetime.now().date()
 
+            inkusagecnt = 'заправок: %d' % len(ink.usage)
+
             for unfo in ink.usage:
                 _dd = dnow - unfo.date
 
@@ -588,6 +592,8 @@ class MainWnd():
         self.randominkstatus.set_text(inkstatust)
         self.randominkcolordesc.set_text(inkcolordesc)
         self.randominkmaincolor.set_text(inkmaincolor)
+
+        self.randominkusagecnt.set_text(inkusagecnt)
 
         if inkcolor is None:
             self.randominkcolorimg.set_from_pixbuf(self.nocoloricon)
