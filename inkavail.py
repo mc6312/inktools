@@ -30,7 +30,7 @@ from colorsys import rgb_to_hls
 from collections import OrderedDict, namedtuple
 
 
-VERSION = '1.10.0'
+VERSION = '1.10.1'
 TITLE = 'InkTools'
 TITLE_VERSION = '%s v%s' % (TITLE, VERSION)
 COPYRIGHT = '🄯 2020, 2021 MC-6312'
@@ -86,7 +86,7 @@ MILLILITERS = 1000.0
 """
 
 
-RX_AVAIL_ML = re.compile('^флакон\s([\d\.]+)\s?.*?$', re.UNICODE|re.IGNORECASE)
+RX_AVAIL_ML = re.compile('^флакон\s([\d\.]+)\s?(мл|л|ml|l)?\s?.*?$', re.UNICODE|re.IGNORECASE)
 RX_AVAIL_CR = re.compile('.*картридж.*', re.UNICODE|re.IGNORECASE)
 RX_INK_COLOR = re.compile('^цвет:\s*#([0-9,a-f]{6})$', re.UNICODE|re.IGNORECASE)
 RX_INK_MAIN_COLOR = re.compile('^основной\s+цвет:\s*(.*)$', re.UNICODE|re.IGNORECASE)
@@ -720,10 +720,20 @@ class InkNodeStatistics():
         fok, avails = __get_special_text_node('в наличии', 'наличие')
 
         for availnode in avails:
+            if availnode.text.lower() == 'нет':
+                continue
+
             rm = RX_AVAIL_ML.match(availnode.text)
             if rm:
                 try:
                     avail = float(rm.group(1))
+                    _units = rm.group(2).lower()
+
+                    # допустимые единицы измерения - литры и миллилитры
+                    # если единицы не указаны, или НЕ литры - всегда считаем
+                    # миллилитрами
+                    if _units in ('л', 'l'):
+                        avail *= 1000.0
 
                     node.avail = True
                     node.availMl += avail
